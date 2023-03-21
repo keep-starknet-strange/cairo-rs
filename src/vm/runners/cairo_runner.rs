@@ -453,56 +453,59 @@ impl CairoRunner {
         self.initial_fp
     }
 
-    pub fn get_reference_list(&self) -> HashMap<usize, HintReference> {
-        let mut references = HashMap::<usize, HintReference>::new();
-
-        for (i, reference) in self.program.reference_manager.references.iter().enumerate() {
-            references.insert(
-                i,
-                HintReference {
-                    offset1: reference.value_address.offset1.clone(),
-                    offset2: reference.value_address.offset2.clone(),
-                    dereference: reference.value_address.dereference,
-                    // only store `ap` tracking data if the reference is referred to it
-                    ap_tracking_data: match (
-                        &reference.value_address.offset1,
-                        &reference.value_address.offset2,
-                    ) {
-                        (OffsetValue::Reference(Register::AP, _, _), _)
-                        | (_, OffsetValue::Reference(Register::AP, _, _)) => {
-                            Some(reference.ap_tracking_data.clone())
-                        }
-                        _ => None,
-                    },
-                    cairo_type: Some(reference.value_address.value_type.clone()),
+    pub fn get_reference_list(&self) -> Vec<HintReference> {
+        self.program
+            .reference_manager
+            .references
+            .iter()
+            .map(|reference| HintReference {
+                //FIXME: these clones are probably for unnecessary `BigInt`s
+                offset1: reference.value_address.offset1.clone(),
+                offset2: reference.value_address.offset2.clone(),
+                dereference: reference.value_address.dereference,
+                // only store `ap` tracking data if the reference is referred to it
+                ap_tracking_data: match (
+                    &reference.value_address.offset1,
+                    &reference.value_address.offset2,
+                ) {
+                    (OffsetValue::Reference(Register::AP, _, _), _)
+                    | (_, OffsetValue::Reference(Register::AP, _, _)) => {
+                        Some(reference.ap_tracking_data.clone())
+                    }
+                    _ => None,
                 },
-            );
-        }
-        references
+                cairo_type: Some(reference.value_address.value_type.clone()),
+            })
+            .collect()
     }
 
     /// Gets the data used by the HintProcessor to execute each hint
-    pub fn get_hint_data_dictionary(
+    pub fn get_hint_data(
         &self,
-        references: &HashMap<usize, HintReference>,
+        references: &[HintReference],
         hint_executor: &mut dyn HintProcessor,
-    ) -> Result<HashMap<usize, Vec<Box<dyn Any>>>, VirtualMachineError> {
-        let mut hint_data_dictionary = HashMap::<usize, Vec<Box<dyn Any>>>::new();
-        for (hint_index, hints) in self.program.shared_program_data.hints.iter() {
+    ) -> Result<Vec<Box<dyn Any>>, VirtualMachineError> {
+        let mut hint_data = Vec::with_capacity(self.program.hints.len());
+        for hint_range in self.program.shared_program_data.hints_ranges.iter() {
+            let Some(range) = hint_range else {
+                continue;
+            };
+            let Some(hints) = self.program.shared_program_data.hints.get(range.0..range.0 + range.1.get()) else {
+                continue;
+            };
             for hint in hints {
-                let hint_data = hint_executor.compile_hint(
-                    &hint.code,
-                    &hint.flow_tracking_data.ap_tracking,
-                    &hint.flow_tracking_data.reference_ids,
-                    references,
-                );
-                hint_data_dictionary.entry(*hint_index).or_default().push(
-                    hint_data
-                        .map_err(|_| VirtualMachineError::CompileHintFail(hint.code.clone()))?,
-                );
+                let hint = hint_executor
+                    .compile_hint(
+                        &hint.code,
+                        &hint.flow_tracking_data.ap_tracking,
+                        &hint.flow_tracking_data.reference_ids,
+                        references,
+                    )
+                    .map_err(|_| VirtualMachineError::CompileHintFail(hint.code.clone()))?;
+                hint_data.push(hint);
             }
         }
-        Ok(hint_data_dictionary)
+        Ok(hint_data)
     }
 
     pub fn get_constants(&self) -> &HashMap<String, Felt252> {
@@ -520,14 +523,20 @@ impl CairoRunner {
         hint_processor: &mut dyn HintProcessor,
     ) -> Result<(), VirtualMachineError> {
         let references = self.get_reference_list();
-        let hint_data_dictionary = self.get_hint_data_dictionary(&references, hint_processor)?;
+        let hint_data = self.get_hint_data(&references, hint_processor)?;
         #[cfg(feature = "hooks")]
-        vm.execute_before_first_step(self, &hint_data_dictionary)?;
+        vm.execute_before_first_step(self, &hint_data)?;
         while vm.run_context.pc != address {
+            let hint_data = self
+                .program
+                .hints_ranges
+                .get(vm.run_context.pc.offset)
+                .and_then(|r| r.and_then(|(s, l)| hint_data.get(s..s + l.get())))
+                .unwrap_or(&[]);
             vm.step(
                 hint_processor,
                 &mut self.exec_scopes,
-                &hint_data_dictionary,
+                hint_data,
                 &self.program.constants,
             )?;
         }
@@ -542,17 +551,24 @@ impl CairoRunner {
         hint_processor: &mut dyn HintProcessor,
     ) -> Result<(), VirtualMachineError> {
         let references = self.get_reference_list();
-        let hint_data_dictionary = self.get_hint_data_dictionary(&references, hint_processor)?;
+        let hint_data = self.get_hint_data(&references, hint_processor)?;
 
         for remaining_steps in (1..=steps).rev() {
             if self.final_pc.as_ref() == Some(&vm.run_context.pc) {
                 return Err(VirtualMachineError::EndOfProgram(remaining_steps));
             }
 
+            let hint_data = self
+                .program
+                .hints_ranges
+                .get(vm.run_context.pc.offset)
+                .and_then(|r| r.and_then(|(s, l)| hint_data.get(s..s + l.get())))
+                .unwrap_or(&[]);
             vm.step(
                 hint_processor,
                 &mut self.exec_scopes,
-                &hint_data_dictionary,
+                //FIXME: ranges
+                &hint_data,
                 &self.program.constants,
             )?;
         }

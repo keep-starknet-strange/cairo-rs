@@ -373,7 +373,7 @@ mod tests {
 
         let mut vm = vm!();
 
-        let program = program!(
+        let mut program = program!(
             builtins = vec![BuiltinName::pedersen, BuiltinName::bitwise],
             data = vec_data!(
                 (4612671182993129469_i64),
@@ -396,6 +396,7 @@ mod tests {
             ),
             main = Some(8),
         );
+        program.hints_ranges = vec![None; program.data.len()];
 
         let mut cairo_runner = cairo_runner!(program);
 

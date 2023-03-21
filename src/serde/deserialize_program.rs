@@ -15,6 +15,7 @@ use crate::{
         SIGNATURE_BUILTIN_NAME,
     },
 };
+use core::num::NonZeroUsize;
 use felt::{Felt252, PRIME_STR};
 use num_traits::Num;
 use serde::{de, de::MapAccess, de::SeqAccess, Deserialize, Deserializer, Serialize};
@@ -389,9 +390,41 @@ pub fn parse_program_json(
         }
     }
 
+    let mut program_hints: Vec<_> = program_json
+        .hints
+        .into_iter()
+        .filter(|(_, v)| !v.is_empty())
+        .collect();
+    program_hints.sort_unstable_by(|x, y| x.0.cmp(&y.0));
+
+    let mut hints_ranges = Vec::new();
+    hints_ranges.resize(program_hints.last().map(|(x, _)| x + 1).unwrap_or(0), None);
+
+    let hints_ranges_iter = program_hints
+        .iter()
+        .map(|(k, v)| (k, v.len()))
+        .scan(0, |s, (k, v)| {
+            let res = (
+                k,
+                (
+                    *s,
+                    NonZeroUsize::new(v).expect("empty vecs already filtered"),
+                ),
+            );
+            *s += v;
+            Some(res)
+        });
+
+    for (pc, r) in hints_ranges_iter {
+        hints_ranges[*pc] = Some(r);
+    }
+
+    let hints = program_hints.into_iter().flat_map(|(_, v)| v).collect();
+
     let shared_program_data = SharedProgramData {
         data: program_json.data,
         hints: program_json.hints,
+        hints_ranges,
         main: entrypoint_pc,
         start,
         end,
@@ -586,7 +619,7 @@ mod tests {
             MaybeRelocatable::Int(Felt252::new(2345108766317314046_i64)),
         ];
 
-        let mut hints: HashMap<usize, Vec<HintParams>> = HashMap::new();
+        let mut hints = HashMap::new();
         hints.insert(
             0,
             vec![HintParams {
@@ -777,10 +810,8 @@ mod tests {
             MaybeRelocatable::Int(Felt252::new(2345108766317314046_i64)),
         ];
 
-        let mut hints: HashMap<usize, Vec<HintParams>> = HashMap::new();
-        hints.insert(
-            0,
-            vec![HintParams {
+        let hints = vec![
+            HintParams {
                 code: "memory[ap] = segments.add()".to_string(),
                 accessible_scopes: vec![
                     String::from("starkware.cairo.common.alloc"),
@@ -793,11 +824,8 @@ mod tests {
                     },
                     reference_ids: HashMap::new(),
                 },
-            }],
-        );
-        hints.insert(
-            46,
-            vec![HintParams {
+            },
+            HintParams {
                 code: "import math".to_string(),
                 accessible_scopes: vec![String::from("__main__"), String::from("__main__.main")],
                 flow_tracking_data: FlowTrackingData {
@@ -807,13 +835,17 @@ mod tests {
                     },
                     reference_ids: HashMap::new(),
                 },
-            }],
-        );
+            },
+        ];
+        let mut hints_ranges = vec![None; 47];
+        hints_ranges[0] = Some((0, NonZeroUsize::new(1).unwrap()));
+        hints_ranges[46] = Some((1, NonZeroUsize::new(1).unwrap()));
 
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, Some(0));
         assert_eq!(program.shared_program_data.hints, hints);
+        assert_eq!(program.shared_program_data.hints_ranges, hints_ranges);
     }
 
     /// Deserialize a program without an entrypoint.
@@ -835,10 +867,8 @@ mod tests {
             MaybeRelocatable::Int(Felt252::new(2345108766317314046_i64)),
         ];
 
-        let mut hints: HashMap<usize, Vec<HintParams>> = HashMap::new();
-        hints.insert(
-            0,
-            vec![HintParams {
+        let hints = vec![
+            HintParams {
                 code: "memory[ap] = segments.add()".to_string(),
                 accessible_scopes: vec![
                     String::from("starkware.cairo.common.alloc"),
@@ -851,11 +881,8 @@ mod tests {
                     },
                     reference_ids: HashMap::new(),
                 },
-            }],
-        );
-        hints.insert(
-            46,
-            vec![HintParams {
+            },
+            HintParams {
                 code: "import math".to_string(),
                 accessible_scopes: vec![String::from("__main__"), String::from("__main__.main")],
                 flow_tracking_data: FlowTrackingData {
@@ -865,13 +892,17 @@ mod tests {
                     },
                     reference_ids: HashMap::new(),
                 },
-            }],
-        );
+            },
+        ];
+        let mut hints_ranges = vec![None; 47];
+        hints_ranges[0] = Some((0, NonZeroUsize::new(1).unwrap()));
+        hints_ranges[46] = Some((1, NonZeroUsize::new(1).unwrap()));
 
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
         assert_eq!(program.shared_program_data.hints, hints);
+        assert_eq!(program.shared_program_data.hints_ranges, hints_ranges);
     }
 
     #[test]

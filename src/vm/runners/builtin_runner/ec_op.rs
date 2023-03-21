@@ -416,7 +416,7 @@ mod tests {
 
         vm.segments.segment_used_sizes = Some(vec![0]);
 
-        let program = program!(
+        let mut program = program!(
             builtins = vec![BuiltinName::pedersen],
             data = vec_data!(
                 (4612671182993129469_i64),
@@ -439,6 +439,7 @@ mod tests {
             ),
             main = Some(8),
         );
+        program.hints_ranges = vec![None; program.data.len()];
         let mut cairo_runner = cairo_runner!(program);
 
         let mut hint_processor = BuiltinHintProcessor::new_empty();
@@ -460,7 +461,7 @@ mod tests {
 
         let mut vm = vm!();
 
-        let program = program!(
+        let mut program = program!(
             builtins = vec![BuiltinName::ec_op],
             data = vec_data!(
                 (4612671182993129469_i64),
@@ -483,6 +484,7 @@ mod tests {
             ),
             main = Some(8),
         );
+        program.hints_ranges = vec![None; program.data.len()];
 
         let mut cairo_runner = cairo_runner!(program);
 

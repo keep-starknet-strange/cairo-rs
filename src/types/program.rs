@@ -11,6 +11,7 @@ use crate::{
 };
 #[cfg(feature = "cairo-1-hints")]
 use cairo_lang_starknet::casm_contract_class::CasmContractClass;
+use core::num::NonZeroUsize;
 use felt::{Felt252, PRIME_STR};
 
 #[cfg(feature = "std")]
@@ -40,7 +41,8 @@ use std::path::Path;
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub(crate) struct SharedProgramData {
     pub(crate) data: Vec<MaybeRelocatable>,
-    pub(crate) hints: HashMap<usize, Vec<HintParams>>,
+    pub(crate) hints: Vec<HintParams>,
+    pub(crate) hints_ranges: Vec<Option<(usize, NonZeroUsize)>>,
     pub(crate) main: Option<usize>,
     //start and end labels will only be used in proof-mode
     pub(crate) start: Option<usize>,
@@ -80,12 +82,44 @@ impl Program {
                 constants.insert(key.clone(), value);
             }
         }
+
+        let mut hints: Vec<_> = hints.into_iter().filter(|(_, v)| !v.is_empty()).collect();
+        hints.sort_unstable_by(|x, y| x.0.cmp(&y.0));
+
+        let mut hints_ranges = Vec::new();
+        hints_ranges.resize(hints.last().map(|(x, _)| x + 1).unwrap_or(0), None);
+
+        let hints_ranges_iter = hints
+            .iter()
+            .map(|(k, v)| (k, v.len()))
+            .scan(0, |s, (k, v)| {
+                let res = (
+                    k,
+                    (
+                        *s,
+                        NonZeroUsize::new(v).expect("empty vecs already filtered"),
+                    ),
+                );
+                *s += v;
+                Some(res)
+            });
+
+        for (pc, r) in hints_ranges_iter {
+            hints_ranges[*pc] = Some(r);
+        }
+
+        let hints = hints.into_iter().flat_map(|(_, v)| v).collect();
+
         let shared_program_data = SharedProgramData {
             data,
             hints,
             main,
             start: None,
             end: None,
+            hints,
+            hints_ranges,
+            reference_manager,
+            identifiers,
             error_message_attributes,
             instruction_locations,
             identifiers,
@@ -839,7 +873,8 @@ mod tests {
     fn default_program() {
         let shared_program_data = SharedProgramData {
             data: Vec::new(),
-            hints: HashMap::new(),
+            hints: Vec::new(),
+            hints_ranges: Vec::new(),
             main: None,
             start: None,
             end: None,
