@@ -86,9 +86,6 @@ impl Program {
         let mut hints: Vec<_> = hints.into_iter().filter(|(_, v)| !v.is_empty()).collect();
         hints.sort_unstable_by(|x, y| x.0.cmp(&y.0));
 
-        let mut hints_ranges = Vec::new();
-        hints_ranges.resize(hints.last().map(|(x, _)| x + 1).unwrap_or(0), None);
-
         let hints_ranges_iter = hints
             .iter()
             .map(|(k, v)| (k, v.len()))
@@ -104,6 +101,7 @@ impl Program {
                 Some(res)
             });
 
+        let mut hints_ranges = vec![None; hints.last().map(|(x, _)| x + 1).unwrap_or(0)];
         for (pc, r) in hints_ranges_iter {
             hints_ranges[*pc] = Some(r);
         }
