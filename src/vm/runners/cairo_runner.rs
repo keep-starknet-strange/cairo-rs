@@ -567,8 +567,7 @@ impl CairoRunner {
             vm.step(
                 hint_processor,
                 &mut self.exec_scopes,
-                //FIXME: ranges
-                &hint_data,
+                hint_data,
                 &self.program.constants,
             )?;
         }
