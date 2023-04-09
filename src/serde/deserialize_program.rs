@@ -423,7 +423,7 @@ pub fn parse_program_json(
 
     let shared_program_data = SharedProgramData {
         data: program_json.data,
-        hints: program_json.hints,
+        hints,
         hints_ranges,
         main: entrypoint_pc,
         start,

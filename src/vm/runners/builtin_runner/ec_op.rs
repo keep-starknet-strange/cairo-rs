@@ -439,7 +439,7 @@ mod tests {
             ),
             main = Some(8),
         );
-        program.hints_ranges = vec![None; program.data.len()];
+        //program.hints_ranges = vec![None; program.data.len()];
         let mut cairo_runner = cairo_runner!(program);
 
         let mut hint_processor = BuiltinHintProcessor::new_empty();
@@ -484,7 +484,7 @@ mod tests {
             ),
             main = Some(8),
         );
-        program.hints_ranges = vec![None; program.data.len()];
+        //program.hints_ranges = vec![None; program.data.len()];
 
         let mut cairo_runner = cairo_runner!(program);
 

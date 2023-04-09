@@ -485,7 +485,7 @@ impl CairoRunner {
         references: &[HintReference],
         hint_executor: &mut dyn HintProcessor,
     ) -> Result<Vec<Box<dyn Any>>, VirtualMachineError> {
-        let mut hint_data = Vec::with_capacity(self.program.hints.len());
+        let mut hint_data = Vec::with_capacity(self.program.shared_program_data.hints.len());
         for hint_range in self.program.shared_program_data.hints_ranges.iter() {
             let Some(range) = hint_range else {
                 continue;
@@ -529,6 +529,7 @@ impl CairoRunner {
         while vm.run_context.pc != address {
             let hint_data = self
                 .program
+                .shared_program_data
                 .hints_ranges
                 .get(vm.run_context.pc.offset)
                 .and_then(|r| r.and_then(|(s, l)| hint_data.get(s..s + l.get())))
@@ -560,6 +561,7 @@ impl CairoRunner {
 
             let hint_data = self
                 .program
+                .shared_program_data
                 .hints_ranges
                 .get(vm.run_context.pc.offset)
                 .and_then(|r| r.and_then(|(s, l)| hint_data.get(s..s + l.get())))

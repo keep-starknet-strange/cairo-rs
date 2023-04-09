@@ -111,16 +111,13 @@ impl Program {
         let shared_program_data = SharedProgramData {
             data,
             hints,
+            hints_ranges,
             main,
             start: None,
             end: None,
-            hints,
-            hints_ranges,
-            reference_manager,
             identifiers,
             error_message_attributes,
             instruction_locations,
-            identifiers,
         };
         Ok(Self {
             shared_program_data: Arc::new(shared_program_data),
@@ -272,6 +269,106 @@ mod tests {
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
         assert_eq!(program.shared_program_data.identifiers, HashMap::new());
+        assert_eq!(program.shared_program_data.hints, Vec::new());
+        assert_eq!(program.shared_program_data.hints_ranges, Vec::new());
+    }
+
+    #[test]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn new_program_with_hints() {
+        let reference_manager = ReferenceManager {
+            references: Vec::new(),
+        };
+
+        let builtins: Vec<BuiltinName> = Vec::new();
+        let data: Vec<MaybeRelocatable> = vec![
+            mayberelocatable!(5189976364521848832),
+            mayberelocatable!(1000),
+            mayberelocatable!(5189976364521848832),
+            mayberelocatable!(2000),
+            mayberelocatable!(5201798304953696256),
+            mayberelocatable!(2345108766317314046),
+        ];
+
+        //let hints = HashMap::from([(5, vec!["c", "d"]), (1, vec!["a"]), (4, vec!["b"])]);
+
+        let program = Program::new(
+            builtins.clone(),
+            data.clone(),
+            None,
+            //hints.clone(),
+            HashMap::new(),
+            reference_manager,
+            HashMap::new(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(program.shared_program_data.builtins, builtins);
+        assert_eq!(program.shared_program_data.data, data);
+        assert_eq!(program.shared_program_data.main, None);
+        assert_eq!(program.shared_program_data.identifiers, HashMap::new());
+        assert_eq!(
+            program.shared_program_data.hints,
+            vec![
+                HintParams {
+                    code: "a".to_string(),
+                    accessible_scopes: vec![],
+                    flow_tracking_data: FlowTrackingData {
+                        ap_tracking: ApTracking {
+                            group: 0,
+                            offset: 0,
+                        },
+                        reference_ids: HashMap::new(),
+                    },
+                },
+                HintParams {
+                    code: "b".to_string(),
+                    accessible_scopes: vec![],
+                    flow_tracking_data: FlowTrackingData {
+                        ap_tracking: ApTracking {
+                            group: 0,
+                            offset: 0,
+                        },
+                        reference_ids: HashMap::new(),
+                    },
+                },
+                HintParams {
+                    code: "c".to_string(),
+                    accessible_scopes: vec![],
+                    flow_tracking_data: FlowTrackingData {
+                        ap_tracking: ApTracking {
+                            group: 0,
+                            offset: 0,
+                        },
+                        reference_ids: HashMap::new(),
+                    },
+                },
+                HintParams {
+                    code: "d".to_string(),
+                    accessible_scopes: vec![],
+                    flow_tracking_data: FlowTrackingData {
+                        ap_tracking: ApTracking {
+                            group: 0,
+                            offset: 0,
+                        },
+                        reference_ids: HashMap::new(),
+                    },
+                }
+            ],
+        );
+        assert_eq!(
+            program.shared_program_data.hints_ranges,
+            vec![
+                None,
+                Some((0, NonZeroUsize::new(1usize).unwrap())),
+                None,
+                None,
+                Some((1, NonZeroUsize::new(1usize).unwrap())),
+                Some((2, NonZeroUsize::new(2usize).unwrap())),
+            ]
+        );
     }
 
     #[test]
