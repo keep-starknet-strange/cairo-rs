@@ -80,6 +80,7 @@ fn get_ids_data(
 pub struct HintReference {
     pub offset1: OffsetValue,
     pub offset2: OffsetValue,
+    pub pc: Option<usize>,
     pub dereference: bool,
     pub ap_tracking_data: Option<ApTracking>,
     pub cairo_type: Option<String>,
@@ -90,6 +91,7 @@ impl HintReference {
         HintReference {
             offset1: OffsetValue::Reference(Register::FP, offset1, false),
             offset2: OffsetValue::Value(0),
+            pc: None,
             ap_tracking_data: None,
             dereference: true,
             cairo_type: None,
@@ -100,6 +102,7 @@ impl HintReference {
         HintReference {
             offset1: OffsetValue::Reference(Register::FP, offset1, inner_dereference),
             offset2: OffsetValue::Value(offset2),
+            pc: None,
             ap_tracking_data: None,
             dereference,
             cairo_type: None,
@@ -112,6 +115,7 @@ impl From<Reference> for HintReference {
         HintReference {
             offset1: reference.value_address.offset1.clone(),
             offset2: reference.value_address.offset2.clone(),
+            pc: reference.pc,
             dereference: reference.value_address.dereference,
             // only store `ap` tracking data if the reference is referred to it
             ap_tracking_data: match (

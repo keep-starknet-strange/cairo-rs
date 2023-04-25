@@ -68,5 +68,7 @@ cairo-lang-casm-contract-class = { git = "https://github.com/keep-starknet-stran
 ark-ff = { version = "0.4.0-alpha.7", default-features = false }
 ark-std = { version = "0.3.0", default-features = false }
 
+pretty_assertions = "1.3.0"
+
 [profile.release]
 lto = "fat"
