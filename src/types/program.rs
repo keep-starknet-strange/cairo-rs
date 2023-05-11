@@ -290,14 +290,29 @@ mod tests {
             mayberelocatable!(2345108766317314046),
         ];
 
-        //let hints = HashMap::from([(5, vec!["c", "d"]), (1, vec!["a"]), (4, vec!["b"])]);
+        let str_to_hint_param = |s: &str| HintParams {
+            code: s.to_string(),
+            accessible_scopes: vec![],
+            flow_tracking_data: FlowTrackingData {
+                ap_tracking: ApTracking {
+                    group: 0,
+                    offset: 0,
+                },
+                reference_ids: HashMap::new(),
+            },
+        };
+
+        let hints = HashMap::from([
+            (5, vec![str_to_hint_param("c"), str_to_hint_param("d")]),
+            (1, vec![str_to_hint_param("a")]),
+            (4, vec![str_to_hint_param("b")]),
+        ]);
 
         let program = Program::new(
             builtins.clone(),
             data.clone(),
             None,
-            //hints.clone(),
-            HashMap::new(),
+            hints,
             reference_manager,
             HashMap::new(),
             Vec::new(),
@@ -305,58 +320,16 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(program.shared_program_data.builtins, builtins);
+        assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
         assert_eq!(program.shared_program_data.identifiers, HashMap::new());
         assert_eq!(
             program.shared_program_data.hints,
-            vec![
-                HintParams {
-                    code: "a".to_string(),
-                    accessible_scopes: vec![],
-                    flow_tracking_data: FlowTrackingData {
-                        ap_tracking: ApTracking {
-                            group: 0,
-                            offset: 0,
-                        },
-                        reference_ids: HashMap::new(),
-                    },
-                },
-                HintParams {
-                    code: "b".to_string(),
-                    accessible_scopes: vec![],
-                    flow_tracking_data: FlowTrackingData {
-                        ap_tracking: ApTracking {
-                            group: 0,
-                            offset: 0,
-                        },
-                        reference_ids: HashMap::new(),
-                    },
-                },
-                HintParams {
-                    code: "c".to_string(),
-                    accessible_scopes: vec![],
-                    flow_tracking_data: FlowTrackingData {
-                        ap_tracking: ApTracking {
-                            group: 0,
-                            offset: 0,
-                        },
-                        reference_ids: HashMap::new(),
-                    },
-                },
-                HintParams {
-                    code: "d".to_string(),
-                    accessible_scopes: vec![],
-                    flow_tracking_data: FlowTrackingData {
-                        ap_tracking: ApTracking {
-                            group: 0,
-                            offset: 0,
-                        },
-                        reference_ids: HashMap::new(),
-                    },
-                }
-            ],
+            vec!["a", "b", "c", "d"]
+                .into_iter()
+                .map(str_to_hint_param)
+                .collect::<Vec<_>>(),
         );
         assert_eq!(
             program.shared_program_data.hints_ranges,

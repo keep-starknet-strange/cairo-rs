@@ -343,10 +343,42 @@ pub mod test_utils {
 
     impl From<ProgramFlat> for Program {
         fn from(val: ProgramFlat) -> Self {
+            // TODO: refactor this, possibly into a function
+            let mut hints: Vec<_> = val
+                .hints
+                .into_iter()
+                .filter(|(_, v)| !v.is_empty())
+                .collect();
+            hints.sort_unstable_by(|x, y| x.0.cmp(&y.0));
+
+            let hints_ranges_iter = hints
+                .iter()
+                .map(|(k, v)| (k, v.len()))
+                .scan(0, |s, (k, v)| {
+                    let res = (
+                        k,
+                        (
+                            *s,
+                            crate::stdlib::num::NonZeroUsize::new(v)
+                                .expect("empty vecs already filtered"),
+                        ),
+                    );
+                    *s += v;
+                    Some(res)
+                });
+
+            let mut hints_ranges = vec![None; hints.last().map(|(x, _)| x + 1).unwrap_or(0)];
+            for (pc, r) in hints_ranges_iter {
+                hints_ranges[*pc] = Some(r);
+            }
+
+            let hints = hints.into_iter().flat_map(|(_, v)| v).collect();
+
             Program {
                 shared_program_data: Arc::new(SharedProgramData {
                     data: val.data,
-                    hints: val.hints,
+                    hints,
+                    hints_ranges,
                     main: val.main,
                     start: val.start,
                     end: val.end,

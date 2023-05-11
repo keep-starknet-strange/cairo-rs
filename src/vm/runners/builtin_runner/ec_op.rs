@@ -416,7 +416,7 @@ mod tests {
 
         vm.segments.segment_used_sizes = Some(vec![0]);
 
-        let mut program = program!(
+        let program = program!(
             builtins = vec![BuiltinName::pedersen],
             data = vec_data!(
                 (4612671182993129469_i64),
@@ -461,7 +461,7 @@ mod tests {
 
         let mut vm = vm!();
 
-        let mut program = program!(
+        let program = program!(
             builtins = vec![BuiltinName::ec_op],
             data = vec_data!(
                 (4612671182993129469_i64),

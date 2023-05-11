@@ -373,7 +373,7 @@ mod tests {
 
         let mut vm = vm!();
 
-        let mut program = program!(
+        let program = program!(
             builtins = vec![BuiltinName::pedersen, BuiltinName::bitwise],
             data = vec_data!(
                 (4612671182993129469_i64),
