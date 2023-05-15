@@ -1,6 +1,6 @@
 [package]
 name = "cairo-take_until_unbalanced"
-version = "0.24.2-rc1"
+version = "0.25.0"
 authors = [
     "Jens Getreu <getreu@getreu@web.de>",
     "LambdaClass <hello@lambdaclass.com>",

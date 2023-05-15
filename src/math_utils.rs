@@ -6,7 +6,7 @@ use felt::Felt252;
 use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_integer::Integer;
 use num_prime::nt_funcs::is_prime;
-use num_traits::{Bounded, One, Pow, Signed, Zero};
+use num_traits::{One, Signed, Zero};
 use rand::{rngs::SmallRng, SeedableRng};
 ///Returns the integer square root of the nonnegative integer n.
 ///This is the floor of the exact square root of n.
@@ -151,38 +151,6 @@ pub fn ec_double_slope(point: &(BigInt, BigInt), alpha: &BigInt, prime: &BigInt)
         &(2_i32 * &point.1),
         prime,
     )
-}
-
-pub fn sqrt(n: &Felt252) -> Felt252 {
-    // Based on Tonelli-Shanks' algorithm for finding square roots
-    // and sympy's library implementation of said algorithm.
-    if n.is_zero() || n.is_one() {
-        return n.clone();
-    }
-
-    let max_felt = Felt252::max_value();
-    let trailing_prime = Felt252::max_value() >> 192; // 0x800000000000011
-    let a = n.pow(&trailing_prime);
-    let d = (&Felt252::new(3_i32)).pow(&trailing_prime);
-    let mut m = Felt252::zero();
-    let mut exponent = Felt252::one() << 191_u32;
-    let mut adm;
-    for i in 0..192_u32 {
-        adm = &a * &(&d).pow(&m);
-        adm = (&adm).pow(&exponent);
-        exponent >>= 1;
-        // if adm ≡ -1 (mod CAIRO_PRIME)
-        if adm == max_felt {
-            m += Felt252::one() << i;
-        }
-    }
-    let root_1 = n.pow(&((trailing_prime + 1_u32) >> 1)) * (&d).pow(&(m >> 1));
-    let root_2 = &max_felt - &root_1 + 1_usize;
-    if root_1 < root_2 {
-        root_1
-    } else {
-        root_2
-    }
 }
 
 // Adapted from sympy _sqrt_prime_power with k == 1
@@ -729,22 +697,6 @@ mod tests {
 
     #[test]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-    fn test_sqrt() {
-        let n = Felt252::from_str_radix(
-            "99957092485221722822822221624080199277265330641980989815386842231144616633668",
-            10,
-        )
-        .unwrap();
-        let expected_sqrt = Felt252::from_str_radix(
-            "205857351767627712295703269674687767888261140702556021834663354704341414042",
-            10,
-        )
-        .unwrap();
-        assert_eq!(sqrt(&n), expected_sqrt);
-    }
-
-    #[test]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
     fn test_sqrt_prime_power() {
         let n: BigUint = 25_u32.into();
         let p: BigUint = 18446744069414584321_u128.into();
@@ -845,20 +797,6 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     proptest! {
-        #[test]
-        // Test for sqrt of a quadratic residue. Result should be the minimum root.
-        fn sqrt_felt_test(ref x in any::<[u8; 32]>()) {
-            let x = &Felt252::from_bytes_be(x);
-            let x_sq = x * x;
-            let sqrt = sqrt(&x_sq);
-
-            if &sqrt != x {
-                prop_assert_eq!(&(Felt252::max_value() - sqrt + 1_usize), x);
-            } else {
-                prop_assert_eq!(&sqrt, x);
-            }
-        }
-
         #[test]
         // Test for sqrt_prime_power_ of a quadratic residue. Result should be the minimum root.
         fn sqrt_prime_power_using_random_prime(ref x in any::<[u8; 38]>(), ref y in any::<u64>()) {

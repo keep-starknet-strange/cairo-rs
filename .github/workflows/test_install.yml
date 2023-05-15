@@ -1,8 +1,11 @@
 name: Test dependencies and cairo-rs install
 
 on:
+  merge_group:
   push:
-    branches-ignore: [ 'main' ]
+    branches: [ main ]
+  pull_request:
+    branches: [ '*' ]
 
 jobs:
   install:

@@ -174,7 +174,7 @@ test-wasm: $(COMPILED_PROOF_TESTS) $(COMPILED_TESTS) $(COMPILED_BAD_TESTS) $(COM
 	wasm-pack test --release --node --no-default-features
 
 clippy:
-	cargo clippy --all --all-features --benches --examples --tests -- -D warnings
+	cargo clippy --workspace --all-features --benches --examples --tests -- -D warnings
 
 coverage:
 	cargo llvm-cov report --lcov --output-path lcov.info

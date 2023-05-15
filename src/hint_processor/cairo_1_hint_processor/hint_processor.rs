@@ -17,6 +17,7 @@ use crate::{
 use ark_ff::fields::{Fp256, MontBackend, MontConfig};
 use ark_ff::{Field, PrimeField};
 use ark_std::UniformRand;
+use cairo_lang_casm::hints::{CoreHintBase, DeprecatedHint};
 use cairo_lang_casm::{
     hints::{CoreHint, Hint},
     operand::{CellRef, ResOperand},
@@ -64,33 +65,39 @@ impl Cairo1HintProcessor {
         hint: &Hint,
     ) -> Result<(), HintError> {
         match hint {
-            Hint::Core(CoreHint::AllocSegment { dst }) => self.alloc_segment(vm, dst),
-            Hint::Core(CoreHint::TestLessThan { lhs, rhs, dst }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::AllocSegment { dst })) => {
+                self.alloc_segment(vm, dst)
+            }
+            Hint::Core(CoreHintBase::Core(CoreHint::TestLessThan { lhs, rhs, dst })) => {
                 self.test_less_than(vm, lhs, rhs, dst)
             }
-            Hint::Core(CoreHint::TestLessThanOrEqual { lhs, rhs, dst }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::TestLessThanOrEqual { lhs, rhs, dst })) => {
                 self.test_less_than_or_equal(vm, lhs, rhs, dst)
             }
-            Hint::Core(CoreHint::Felt252DictRead {
+            Hint::Core(CoreHintBase::Deprecated(DeprecatedHint::Felt252DictRead {
                 dict_ptr,
                 key,
                 value_dst,
-            }) => self.dict_read(vm, exec_scopes, dict_ptr, key, value_dst),
-            Hint::Core(CoreHint::SquareRoot { value, dst }) => self.square_root(vm, value, dst),
-            Hint::Core(CoreHint::GetSegmentArenaIndex {
+            })) => self.dict_read(vm, exec_scopes, dict_ptr, key, value_dst),
+            Hint::Core(CoreHintBase::Core(CoreHint::SquareRoot { value, dst })) => {
+                self.square_root(vm, value, dst)
+            }
+            Hint::Core(CoreHintBase::Core(CoreHint::GetSegmentArenaIndex {
                 dict_end_ptr,
                 dict_index,
-            }) => self.get_segment_arena_index(vm, exec_scopes, dict_end_ptr, dict_index),
+            })) => self.get_segment_arena_index(vm, exec_scopes, dict_end_ptr, dict_index),
 
-            Hint::Core(CoreHint::DivMod {
+            Hint::Core(CoreHintBase::Core(CoreHint::DivMod {
                 lhs,
                 rhs,
                 quotient,
                 remainder,
-            }) => self.div_mod(vm, lhs, rhs, quotient, remainder),
-            Hint::Core(CoreHint::DebugPrint { start, end }) => self.debug_print(vm, start, end),
+            })) => self.div_mod(vm, lhs, rhs, quotient, remainder),
+            Hint::Core(CoreHintBase::Core(CoreHint::DebugPrint { start, end })) => {
+                self.debug_print(vm, start, end)
+            }
 
-            Hint::Core(CoreHint::Uint256SquareRoot {
+            Hint::Core(CoreHintBase::Core(CoreHint::Uint256SquareRoot {
                 value_low,
                 value_high,
                 sqrt0,
@@ -98,7 +105,7 @@ impl Cairo1HintProcessor {
                 remainder_low,
                 remainder_high,
                 sqrt_mul_2_minus_remainder_ge_u128,
-            }) => self.uint256_square_root(
+            })) => self.uint256_square_root(
                 vm,
                 value_low,
                 value_high,
@@ -109,11 +116,11 @@ impl Cairo1HintProcessor {
                 sqrt_mul_2_minus_remainder_ge_u128,
             ),
 
-            Hint::Core(CoreHint::GetNextDictKey { next_key }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::GetNextDictKey { next_key })) => {
                 self.get_next_dict_key(vm, exec_scopes, next_key)
             }
 
-            Hint::Core(CoreHint::Uint256DivMod {
+            Hint::Core(CoreHintBase::Core(CoreHint::Uint256DivMod {
                 dividend_low,
                 dividend_high,
                 divisor_low,
@@ -126,7 +133,7 @@ impl Cairo1HintProcessor {
                 extra1,
                 remainder_low,
                 remainder_high,
-            }) => self.uint256_div_mod(
+            })) => self.uint256_div_mod(
                 vm,
                 dividend_low,
                 dividend_high,
@@ -141,62 +148,65 @@ impl Cairo1HintProcessor {
                 remainder_low,
                 remainder_high,
             ),
-            Hint::Core(CoreHint::Felt252DictWrite {
+            Hint::Core(CoreHintBase::Deprecated(DeprecatedHint::Felt252DictWrite {
                 dict_ptr,
                 key,
                 value,
-            }) => self.dict_write(exec_scopes, vm, dict_ptr, key, value),
-            Hint::Core(CoreHint::AssertLeIsFirstArcExcluded {
+            })) => self.dict_write(exec_scopes, vm, dict_ptr, key, value),
+            Hint::Core(CoreHintBase::Core(CoreHint::AssertLeIsFirstArcExcluded {
                 skip_exclude_a_flag,
-            }) => self.assert_le_if_first_arc_exclueded(vm, skip_exclude_a_flag, exec_scopes),
+            })) => self.assert_le_if_first_arc_excluded(vm, skip_exclude_a_flag, exec_scopes),
 
-            Hint::Core(CoreHint::AssertAllAccessesUsed { n_used_accesses }) => {
-                self.assert_all_accesses_used(vm, exec_scopes, n_used_accesses)
-            }
+            Hint::Core(CoreHintBase::Deprecated(DeprecatedHint::AssertAllAccessesUsed {
+                n_used_accesses,
+            })) => self.assert_all_accesses_used(vm, exec_scopes, n_used_accesses),
 
-            Hint::Core(CoreHint::AssertLeIsSecondArcExcluded {
+            Hint::Core(CoreHintBase::Core(CoreHint::AssertLeIsSecondArcExcluded {
                 skip_exclude_b_minus_a,
-            }) => self.assert_le_is_second_excluded(vm, skip_exclude_b_minus_a, exec_scopes),
+            })) => self.assert_le_is_second_excluded(vm, skip_exclude_b_minus_a, exec_scopes),
 
-            Hint::Core(CoreHint::LinearSplit {
+            Hint::Core(CoreHintBase::Core(CoreHint::LinearSplit {
                 value,
                 scalar,
                 max_x,
                 x,
                 y,
-            }) => self.linear_split(vm, value, scalar, max_x, x, y),
+            })) => self.linear_split(vm, value, scalar, max_x, x, y),
 
-            Hint::Core(CoreHint::AllocFelt252Dict { segment_arena_ptr }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::AllocFelt252Dict { segment_arena_ptr })) => {
                 self.alloc_felt_256_dict(vm, segment_arena_ptr, exec_scopes)
             }
 
-            Hint::Core(CoreHint::AssertLeFindSmallArcs {
+            Hint::Core(CoreHintBase::Core(CoreHint::AssertLeFindSmallArcs {
                 range_check_ptr,
                 a,
                 b,
-            }) => self.assert_le_find_small_arcs(vm, exec_scopes, range_check_ptr, a, b),
+            })) => self.assert_le_find_small_arcs(vm, exec_scopes, range_check_ptr, a, b),
 
-            Hint::Core(CoreHint::RandomEcPoint { x, y }) => self.random_ec_point(vm, x, y),
+            Hint::Core(CoreHintBase::Core(CoreHint::RandomEcPoint { x, y })) => {
+                self.random_ec_point(vm, x, y)
+            }
 
-            Hint::Core(CoreHint::ShouldSkipSquashLoop { should_skip_loop }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::ShouldSkipSquashLoop { should_skip_loop })) => {
                 self.should_skip_squash_loop(vm, exec_scopes, should_skip_loop)
             }
-            Hint::Core(CoreHint::Felt252DictEntryInit { dict_ptr, key }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::Felt252DictEntryInit { dict_ptr, key })) => {
                 self.dict_entry_init(vm, exec_scopes, dict_ptr, key)
             }
-            Hint::Core(CoreHint::Felt252DictEntryUpdate { dict_ptr, value }) => {
-                self.felt_252_dict_entry_update(vm, exec_scopes, dict_ptr, value)
-            }
-            Hint::Core(CoreHint::GetCurrentAccessDelta { index_delta_minus1 }) => {
-                self.get_current_access_delta(vm, exec_scopes, index_delta_minus1)
-            }
-            Hint::Core(CoreHint::InitSquashData {
+            Hint::Core(CoreHintBase::Core(CoreHint::Felt252DictEntryUpdate {
+                dict_ptr,
+                value,
+            })) => self.felt_252_dict_entry_update(vm, exec_scopes, dict_ptr, value),
+            Hint::Core(CoreHintBase::Core(CoreHint::GetCurrentAccessDelta {
+                index_delta_minus1,
+            })) => self.get_current_access_delta(vm, exec_scopes, index_delta_minus1),
+            Hint::Core(CoreHintBase::Core(CoreHint::InitSquashData {
                 dict_accesses,
                 n_accesses,
                 big_keys,
                 first_key,
                 ..
-            }) => self.init_squash_data(
+            })) => self.init_squash_data(
                 vm,
                 exec_scopes,
                 dict_accesses,
@@ -204,16 +214,24 @@ impl Cairo1HintProcessor {
                 big_keys,
                 first_key,
             ),
-            Hint::Core(CoreHint::AllocConstantSize { size, dst }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::AllocConstantSize { size, dst })) => {
                 self.alloc_constant_size(vm, exec_scopes, size, dst)
             }
-            Hint::Core(CoreHint::GetCurrentAccessIndex { range_check_ptr }) => {
+            Hint::Core(CoreHintBase::Core(CoreHint::GetCurrentAccessIndex { range_check_ptr })) => {
                 self.get_current_access_index(vm, exec_scopes, range_check_ptr)
             }
-            Hint::Core(CoreHint::ShouldContinueSquashLoop { should_continue }) => {
-                self.should_continue_squash_loop(vm, exec_scopes, should_continue)
+            Hint::Core(CoreHintBase::Core(CoreHint::ShouldContinueSquashLoop {
+                should_continue,
+            })) => self.should_continue_squash_loop(vm, exec_scopes, should_continue),
+            Hint::Core(CoreHintBase::Core(CoreHint::FieldSqrt { val, sqrt })) => {
+                self.field_sqrt(vm, val, sqrt)
             }
-            Hint::Core(CoreHint::FieldSqrt { val, sqrt }) => self.field_sqrt(vm, val, sqrt),
+            Hint::Core(CoreHintBase::Core(CoreHint::WideMul128 {
+                lhs,
+                rhs,
+                high,
+                low,
+            })) => self.wide_mul_128(vm, lhs, rhs, high, low),
             hint => Err(HintError::UnknownHint(hint.to_string())),
         }
     }
@@ -245,9 +263,9 @@ impl Cairo1HintProcessor {
         value: &ResOperand,
         dst: &CellRef,
     ) -> Result<(), HintError> {
-        let value = res_operand_get_val(vm, value)?;
+        let value = res_operand_get_val(vm, value)?.to_biguint();
         let result = value.sqrt();
-        vm.insert_value(cell_ref_to_relocatable(dst, vm)?, result)
+        vm.insert_value(cell_ref_to_relocatable(dst, vm)?, Felt252::from(result))
             .map_err(HintError::from)
     }
 
@@ -426,7 +444,7 @@ impl Cairo1HintProcessor {
         Ok(())
     }
 
-    fn assert_le_if_first_arc_exclueded(
+    fn assert_le_if_first_arc_excluded(
         &self,
         vm: &mut VirtualMachine,
         skip_exclude_a_flag: &CellRef,
@@ -447,15 +465,15 @@ impl Cairo1HintProcessor {
         x: &CellRef,
         y: &CellRef,
     ) -> Result<(), HintError> {
-        let value = res_operand_get_val(vm, value)?;
-        let scalar = res_operand_get_val(vm, scalar)?;
-        let max_x = res_operand_get_val(vm, max_x)?;
+        let value = res_operand_get_val(vm, value)?.to_biguint();
+        let scalar = res_operand_get_val(vm, scalar)?.to_biguint();
+        let max_x = res_operand_get_val(vm, max_x)?.to_biguint();
         let x_value = (&value / &scalar).min(max_x);
         let y_value = value - &x_value * &scalar;
 
-        vm.insert_value(cell_ref_to_relocatable(x, vm)?, x_value)
+        vm.insert_value(cell_ref_to_relocatable(x, vm)?, Felt252::from(x_value))
             .map_err(HintError::from)?;
-        vm.insert_value(cell_ref_to_relocatable(y, vm)?, y_value)
+        vm.insert_value(cell_ref_to_relocatable(y, vm)?, Felt252::from(y_value))
             .map_err(HintError::from)?;
 
         Ok(())
@@ -594,29 +612,36 @@ impl Cairo1HintProcessor {
         remainder_high: &CellRef,
         sqrt_mul_2_minus_remainder_ge_u128: &CellRef,
     ) -> Result<(), HintError> {
-        let pow_2_128 = Felt252::from(u128::MAX) + 1u32;
-        let pow_2_64 = Felt252::from(u64::MAX) + 1u32;
-        let value_low = res_operand_get_val(vm, value_low)?;
-        let value_high = res_operand_get_val(vm, value_high)?;
-        let value = value_low + value_high * &pow_2_128;
+        let pow_2_128 = BigUint::from(u128::MAX) + 1u32;
+        let pow_2_64 = BigUint::from(u64::MAX) + 1u32;
+        let value_low = res_operand_get_val(vm, value_low)?.to_biguint();
+        let value_high = res_operand_get_val(vm, value_high)?.to_biguint();
+        let value = value_low + value_high * pow_2_128.clone();
         let sqrt = value.sqrt();
-        let remainder = value - &sqrt * &sqrt;
+        let remainder = value - sqrt.clone() * sqrt.clone();
         let sqrt_mul_2_minus_remainder_ge_u128_val =
-            &sqrt * &Felt252::from(2u32) - &remainder >= pow_2_128;
+            sqrt.clone() * 2u32 - remainder.clone() >= pow_2_128;
 
+        // Guess sqrt limbs.
         let (sqrt1_val, sqrt0_val) = sqrt.div_rem(&pow_2_64);
-        vm.insert_value(cell_ref_to_relocatable(sqrt0, vm)?, sqrt0_val)?;
-        vm.insert_value(cell_ref_to_relocatable(sqrt1, vm)?, sqrt1_val)?;
+        vm.insert_value(
+            cell_ref_to_relocatable(sqrt0, vm)?,
+            Felt252::from(sqrt0_val),
+        )?;
+        vm.insert_value(
+            cell_ref_to_relocatable(sqrt1, vm)?,
+            Felt252::from(sqrt1_val),
+        )?;
 
         let (remainder_high_val, remainder_low_val) = remainder.div_rem(&pow_2_128);
 
         vm.insert_value(
             cell_ref_to_relocatable(remainder_low, vm)?,
-            remainder_low_val,
+            Felt252::from(remainder_low_val),
         )?;
         vm.insert_value(
             cell_ref_to_relocatable(remainder_high, vm)?,
-            remainder_high_val,
+            Felt252::from(remainder_high_val),
         )?;
         vm.insert_value(
             cell_ref_to_relocatable(sqrt_mul_2_minus_remainder_ge_u128, vm)?,
@@ -941,6 +966,29 @@ impl Cairo1HintProcessor {
                 "Field element is not a square".to_string(),
             ))
         }
+    }
+
+    fn wide_mul_128(
+        &self,
+        vm: &mut VirtualMachine,
+        lhs: &ResOperand,
+        rhs: &ResOperand,
+        high: &CellRef,
+        low: &CellRef,
+    ) -> Result<(), HintError> {
+        let mask128 = BigUint::from(u128::MAX);
+        let lhs_val = res_operand_get_val(vm, lhs)?.to_biguint();
+        let rhs_val = res_operand_get_val(vm, rhs)?.to_biguint();
+        let prod = lhs_val * rhs_val;
+        vm.insert_value(
+            cell_ref_to_relocatable(high, vm)?,
+            Felt252::from(prod.clone() >> 128),
+        )?;
+        vm.insert_value(
+            cell_ref_to_relocatable(low, vm)?,
+            Felt252::from(prod & mask128),
+        )
+        .map_err(HintError::from)
     }
 }
 

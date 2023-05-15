@@ -119,14 +119,10 @@ impl Add<i32> for Relocatable {
 impl Add<&Felt252> for Relocatable {
     type Output = Result<Relocatable, MathError>;
     fn add(self, other: &Felt252) -> Result<Relocatable, MathError> {
-        let big_offset = other + self.offset;
-        let new_offset = big_offset
-            .to_usize()
+        let new_offset = (self.offset as u64 + other)
+            .and_then(|x| x.to_usize())
             .ok_or_else(|| MathError::RelocatableAddFelt252OffsetExceeded(self, other.clone()))?;
-        Ok(Relocatable {
-            segment_index: self.segment_index,
-            offset: new_offset,
-        })
+        Ok((self.segment_index, new_offset).into())
     }
 }
 
@@ -155,6 +151,7 @@ impl Sub<usize> for Relocatable {
         Ok(relocatable!(self.segment_index, new_offset))
     }
 }
+
 impl Sub<Relocatable> for Relocatable {
     type Output = Result<usize, MathError>;
     fn sub(self, other: Self) -> Result<usize, MathError> {
@@ -359,6 +356,43 @@ mod tests {
 
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
+
+    #[cfg(feature = "std")]
+    use num_traits::Bounded;
+
+    #[cfg(feature = "std")]
+    use proptest::prelude::*;
+
+    #[cfg(feature = "std")]
+    proptest! {
+        #[test]
+        fn add_relocatable_felt(offset in any::<usize>(), ref bigint in any::<[u8; 32]>()) {
+            let big = &Felt252::from_bytes_be(bigint);
+            let rel = Relocatable::from((0, offset));
+
+            let sum = (big + offset).to_usize()
+                .map(|offset| (0, offset).into());
+            prop_assert_eq!((rel + big).ok(), sum);
+        }
+
+        #[test]
+        fn add_relocatable_felt_extremes(offset in any::<usize>()) {
+            let big_zero = &Felt252::zero();
+            let big_max = &Felt252::max_value();
+            let big_min = &(big_zero + (i64::MIN as usize));
+            let rel = Relocatable::from((0, offset));
+
+            let sum_max = (big_max + offset).to_usize()
+                .map(|offset| (0, offset).into());
+            prop_assert_eq!((rel + big_max).ok(), sum_max);
+            let sum_min = (big_min + offset).to_usize()
+                .map(|offset| (0, offset).into());
+            prop_assert_eq!((rel + big_min).ok(), sum_min);
+            let sum_zero = (big_zero + offset).to_usize()
+                .map(|offset| (0, offset).into());
+            prop_assert_eq!((rel + big_zero).ok(), sum_zero);
+        }
+    }
 
     #[test]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]

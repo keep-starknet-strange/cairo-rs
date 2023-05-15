@@ -17,8 +17,6 @@ use num_bigint::ToBigInt;
 use num_traits::{Bounded, Num, One, Pow, ToPrimitive, Zero};
 use sha2::{Digest, Sha256};
 
-use crate::math_utils::sqrt;
-
 use super::hint_utils::get_ptr_from_var_name;
 
 #[derive(Debug, PartialEq)]
@@ -207,7 +205,7 @@ lazy_static! {
 fn recover_y(x: &BigUint) -> Option<BigUint> {
     let y_squared: BigUint = x.modpow(&BigUint::from(3_u32), &CAIRO_PRIME) + ALPHA * x + &*BETA;
     if is_quad_residue(&y_squared) {
-        Some(sqrt(&Felt252::from(y_squared)).to_biguint())
+        Some(Felt252::from(y_squared).sqrt().to_biguint())
     } else {
         None
     }

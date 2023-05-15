@@ -66,7 +66,7 @@ pub fn is_nn_out_of_range(
     //Main logic (assert a is not negative and within the expected range)
     //let value = if (-a - 1usize).mod_floor(vm.get_prime()) < range_check_builtin._bound {
     let value = match &range_check_builtin._bound {
-        Some(bound) if Felt252::zero() - (a + 1) < *bound => Felt252::zero(),
+        Some(bound) if Felt252::zero() - (a + 1usize) < *bound => Felt252::zero(),
         None => Felt252::zero(),
         _ => Felt252::one(),
     };
@@ -374,20 +374,17 @@ pub fn is_positive(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let value = get_integer_from_var_name("value", vm, ids_data, ap_tracking)?;
+    let value_as_int = value.to_signed_felt();
     let range_check_builtin = vm.get_range_check_builtin()?;
     //Main logic (assert a is positive)
     match &range_check_builtin._bound {
-        Some(bound) if &value.abs() > bound => {
+        Some(bound) if value_as_int.abs() > bound.to_bigint() => {
             return Err(HintError::ValueOutsideValidRange(value.into_owned()))
         }
         _ => {}
     };
 
-    let result = if value.is_positive() {
-        Felt252::one()
-    } else {
-        Felt252::zero()
-    };
+    let result = Felt252::from(value_as_int.is_positive() as u8);
     insert_value_from_var_name("is_positive", result, vm, ids_data, ap_tracking)
 }
 
@@ -665,11 +662,11 @@ pub fn is_quad_residue(
     if x.is_zero() || x.is_one() {
         insert_value_from_var_name("y", x.as_ref().clone(), vm, ids_data, ap_tracking)
     } else if Pow::pow(x.as_ref(), &(Felt252::max_value() >> 1)).is_one() {
-        insert_value_from_var_name("y", crate::math_utils::sqrt(&x), vm, ids_data, ap_tracking)
+        insert_value_from_var_name("y", &x.sqrt(), vm, ids_data, ap_tracking)
     } else {
         insert_value_from_var_name(
             "y",
-            crate::math_utils::sqrt(&(x.as_ref() / Felt252::new(3_i32))),
+            (x.as_ref() / Felt252::new(3_i32)).sqrt(),
             vm,
             ids_data,
             ap_tracking,
@@ -2357,9 +2354,9 @@ mod tests {
             if x.is_zero() || x.is_one() {
                 assert_eq!(vm.get_integer(Relocatable::from((1, 0))).unwrap().as_ref(), x);
             } else if x.pow(&(Felt252::max_value() >> 1)).is_one() {
-                assert_eq!(vm.get_integer(Relocatable::from((1, 0))).unwrap().into_owned(), crate::math_utils::sqrt(x));
+                assert_eq!(vm.get_integer(Relocatable::from((1, 0))).unwrap().into_owned(), x.sqrt());
             } else {
-                assert_eq!(vm.get_integer(Relocatable::from((1, 0))).unwrap().into_owned(), crate::math_utils::sqrt(&(x / Felt252::new(3))));
+                assert_eq!(vm.get_integer(Relocatable::from((1, 0))).unwrap().into_owned(), (x / Felt252::new(3)).sqrt());
             }
         }
     }
