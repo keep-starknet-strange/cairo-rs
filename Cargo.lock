@@ -252,9 +252,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairo-felt"
+version = "0.6.0"
+source = "git+https://github.com/keep-starknet-strange/cairo-rs?branch=no_std-support-with-cairo-1#a4865bf0a0885191dce50ea22ae40b4d3f8998cc"
+dependencies = [
+ "lazy_static",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "cairo-lang-casm"
 version = "2.0.0-rc2"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#64ef5864c5b92ee40b46ecb0b6fd854bd790938d"
+source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#c1dcc9dbf85efcdde020d14cc1cfa64d6640d2ee"
 dependencies = [
  "cairo-lang-utils",
  "hashbrown 0.14.0",
@@ -269,7 +281,7 @@ dependencies = [
 [[package]]
 name = "cairo-lang-casm-contract-class"
 version = "2.0.0-rc2"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#64ef5864c5b92ee40b46ecb0b6fd854bd790938d"
+source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#c1dcc9dbf85efcdde020d14cc1cfa64d6640d2ee"
 dependencies = [
  "cairo-lang-casm",
  "cairo-lang-utils",
@@ -280,9 +292,9 @@ dependencies = [
 [[package]]
 name = "cairo-lang-utils"
 version = "2.0.0-rc2"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#64ef5864c5b92ee40b46ecb0b6fd854bd790938d"
+source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#c1dcc9dbf85efcdde020d14cc1cfa64d6640d2ee"
 dependencies = [
- "cairo-felt 0.6.0",
+ "cairo-felt 0.6.0 (git+https://github.com/keep-starknet-strange/cairo-rs?branch=no_std-support-with-cairo-1)",
  "hashbrown 0.14.0",
  "indexmap 2.0.0",
  "itertools",
