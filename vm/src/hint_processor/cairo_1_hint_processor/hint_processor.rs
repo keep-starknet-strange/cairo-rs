@@ -25,6 +25,7 @@ use cairo_lang_casm::{
 use core::any::Any;
 use core::ops::Shl;
 
+use core::ops::Shl;
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::cast::ToPrimitive;
@@ -96,10 +97,12 @@ impl Cairo1HintProcessor {
                 quotient,
                 remainder,
             })) => self.div_mod(vm, lhs, rhs, quotient, remainder),
+            #[cfg(feature = "std")]
             Hint::Core(CoreHintBase::Core(CoreHint::DebugPrint { start, end })) => {
                 self.debug_print(vm, start, end)
             }
-
+            #[cfg(feature = "std")]
+            Hint::Core(CoreHintBase::Core(CoreHint::DebugPrint { .. })) => {}
             Hint::Core(CoreHintBase::Core(CoreHint::Uint256SquareRoot {
                 value_low,
                 value_high,
@@ -130,7 +133,6 @@ impl Cairo1HintProcessor {
                 divisor1,
                 quotient0,
                 quotient1,
-
                 remainder0,
                 remainder1,
             })) => self.uint256_div_mod(
@@ -669,8 +671,8 @@ impl Cairo1HintProcessor {
         value_high: &ResOperand,
         sqrt0: &CellRef,
         sqrt1: &CellRef,
-        remainder_low: &CellRef,
-        remainder_high: &CellRef,
+        remainder0: &CellRef,
+        remainder1: &CellRef,
         sqrt_mul_2_minus_remainder_ge_u128: &CellRef,
     ) -> Result<(), HintError> {
         let pow_2_128 = BigUint::from(u128::MAX) + 1u32;
@@ -694,15 +696,15 @@ impl Cairo1HintProcessor {
             Felt252::from(sqrt1_val),
         )?;
 
-        let (remainder_high_val, remainder_low_val) = remainder.div_rem(&pow_2_128);
+        let (remainder1_val, remainder0_val) = remainder.div_rem(&pow_2_128);
 
         vm.insert_value(
-            cell_ref_to_relocatable(remainder_low, vm)?,
-            Felt252::from(remainder_low_val),
+            cell_ref_to_relocatable(remainder0, vm)?,
+            Felt252::from(remainder0_val),
         )?;
         vm.insert_value(
-            cell_ref_to_relocatable(remainder_high, vm)?,
-            Felt252::from(remainder_high_val),
+            cell_ref_to_relocatable(remainder1, vm)?,
+            Felt252::from(remainder1_val),
         )?;
         vm.insert_value(
             cell_ref_to_relocatable(sqrt_mul_2_minus_remainder_ge_u128, vm)?,
@@ -753,8 +755,10 @@ impl Cairo1HintProcessor {
                 }
                 curr += 1;
             }
-            println!();
+            curr += 1;
         }
+        println!();
+
         Ok(())
     }
 

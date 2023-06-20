@@ -83,7 +83,7 @@ pub(crate) fn get_ptr(
 
 #[cfg(feature = "std")]
 pub(crate) fn as_relocatable(
-    vm: &mut VirtualMachine,
+    vm: &VirtualMachine,
     value: &ResOperand,
 ) -> Result<Relocatable, HintError> {
     let (base, offset) = extract_buffer(value)?;
