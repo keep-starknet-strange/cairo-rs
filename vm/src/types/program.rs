@@ -17,6 +17,10 @@ use felt::{Felt252, PRIME_STR};
 
 #[cfg(feature = "scale-codec")]
 use parity_scale_codec::{Decode, Encode, Error, Input, Output};
+#[cfg(feature = "scale-codec")]
+use scale_info::build::Fields;
+#[cfg(feature = "scale-codec")]
+use scale_info::{Path as TypeInfoPath, Type, TypeInfo};
 
 #[cfg(feature = "std")]
 use std::path::Path;
@@ -43,7 +47,7 @@ use std::path::Path;
 // failures.
 // Fields in `Program` (other than `SharedProgramData` itself) are used by the main logic.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub(crate) struct SharedProgramData {
     pub(crate) data: Vec<MaybeRelocatable>,
     pub(crate) hints: Hints,
@@ -68,6 +72,17 @@ impl Identifiers {
     }
     pub fn inner_ref(&self) -> &HashMap<String, Identifier> {
         &self.0
+    }
+}
+
+#[cfg(feature = "scale-codec")]
+impl TypeInfo for Identifiers {
+    type Identity = Self;
+
+    fn type_info() -> Type {
+        Type::builder()
+            .path(TypeInfoPath::new("Identifiers", module_path!()))
+            .composite(Fields::unnamed().field(|f| f.ty::<[(String, Identifier)]>()))
     }
 }
 
@@ -107,6 +122,17 @@ impl Hints {
     }
     pub fn inner(&self) -> HashMap<u64, Vec<HintParams>> {
         self.0.clone()
+    }
+}
+
+#[cfg(feature = "scale-codec")]
+impl TypeInfo for Hints {
+    type Identity = Self;
+
+    fn type_info() -> Type {
+        Type::builder()
+            .path(TypeInfoPath::new("Hints", module_path!()))
+            .composite(Fields::unnamed().field(|f| f.ty::<[(u64, Vec<HintParams>)]>()))
     }
 }
 
@@ -155,6 +181,17 @@ impl From<HashMap<u64, InstructionLocation>> for InstructionLocations {
     }
 }
 
+#[cfg(feature = "scale-codec")]
+impl TypeInfo for InstructionLocations {
+    type Identity = Self;
+
+    fn type_info() -> Type {
+        Type::builder()
+            .path(TypeInfoPath::new("InstructionLocations", module_path!()))
+            .composite(Fields::unnamed().field(|f| f.ty::<[(u64, InstructionLocation)]>()))
+    }
+}
+
 /// SCALE trait.
 #[cfg(feature = "scale-codec")]
 impl Encode for InstructionLocations {
@@ -191,6 +228,17 @@ impl Constants {
     }
 }
 
+#[cfg(feature = "scale-codec")]
+impl TypeInfo for Constants {
+    type Identity = Self;
+
+    fn type_info() -> Type {
+        Type::builder()
+            .path(TypeInfoPath::new("Constants", module_path!()))
+            .composite(Fields::unnamed().field(|f| f.ty::<[(String, Felt252)]>()))
+    }
+}
+
 impl From<HashMap<String, Felt252>> for Constants {
     fn from(value: HashMap<String, Felt252>) -> Self {
         Self(value)
@@ -220,7 +268,7 @@ impl Decode for Constants {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Program {
     pub(crate) shared_program_data: Arc<SharedProgramData>,
     pub(crate) constants: Constants,

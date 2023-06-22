@@ -34,7 +34,7 @@ test_utils = [
 ] # This feature will reference every test-oriented feature
 skip_next_instruction_hint = []
 hooks = []
-scale-codec = ["parity-scale-codec"]
+scale-codec = ["parity-scale-codec", "scale-info"]
 
 [dependencies]
 mimalloc = { workspace = true, optional = true }
@@ -81,7 +81,8 @@ ark-ff = { workspace = true, optional = true }
 ark-std = { workspace = true, optional = true }
 
 # Dependencies for scale-codec feature
-parity-scale-codec = { version = "3.1.4", features = [
+scale-info = { workspace = true, optional = true, features = ["derive"] }
+parity-scale-codec = { workspace = true, features = [
     "derive",
 ], default-features = false, optional = true }
 

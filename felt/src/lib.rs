@@ -24,6 +24,10 @@ use num_integer::Integer;
 use num_traits::{Bounded, FromPrimitive, Num, One, Pow, Signed, ToPrimitive, Zero};
 #[cfg(feature = "scale-codec")]
 use parity_scale_codec::{Decode, Encode};
+#[cfg(feature = "scale-codec")]
+use scale_info::build::Fields;
+#[cfg(feature = "scale-codec")]
+use scale_info::{Path, Type, TypeInfo};
 use serde::{Deserialize, Serialize};
 
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
@@ -113,6 +117,16 @@ pub struct ParseFeltError;
 #[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct Felt252 {
     value: FeltBigInt<FIELD_HIGH, FIELD_LOW>,
+}
+
+impl TypeInfo for Felt252 {
+    type Identity = Self;
+
+    fn type_info() -> scale_info::Type {
+        Type::builder()
+            .path(Path::new("Felt252", module_path!()))
+            .composite(Fields::named().field(|f| f.ty::<[u8]>().name("val").type_name("Program")))
+    }
 }
 
 macro_rules! from_num {

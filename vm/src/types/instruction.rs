@@ -5,9 +5,11 @@ use serde::{Deserialize, Serialize};
 use crate::vm::decoding::decoder::decode_instruction;
 #[cfg(feature = "scale-codec")]
 use parity_scale_codec::{Decode, Encode};
+#[cfg(feature = "scale-codec")]
+use scale_info::TypeInfo;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub enum Register {
     AP,
     FP,

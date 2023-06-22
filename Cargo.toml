@@ -67,7 +67,7 @@ cairo-lang-casm-contract-class = { git = "https://github.com/keep-starknet-stran
 
 # Dependencies for scale-codec feature
 parity-scale-codec = { version = "3.1.4", default-features = false }
-
+scale-info = { version = "2.6.0", default-features = false }
 # TODO: check these dependencies for wasm compatibility
 ark-ff = { version = "0.4.0-alpha.7", default-features = false }
 ark-std = { version = "0.3.0", default-features = false }

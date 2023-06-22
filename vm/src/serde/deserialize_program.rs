@@ -22,12 +22,16 @@ use num_traits::float::FloatCore;
 use num_traits::{Num, Pow, Zero};
 #[cfg(feature = "scale-codec")]
 use parity_scale_codec::{Decode, Encode, Error, Input, Output};
+#[cfg(feature = "scale-codec")]
+use scale_info::build::Fields;
+#[cfg(feature = "scale-codec")]
+use scale_info::{Path, Type, TypeInfo};
 use serde::{de, de::MapAccess, de::SeqAccess, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
 // This enum is used to deserialize program builtins into &str and catch non-valid names
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone, Eq, Hash)]
 #[allow(non_camel_case_types)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 
 pub enum BuiltinName {
     output,
@@ -76,7 +80,7 @@ pub struct ProgramJson {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct HintParams {
     pub code: String,
     pub accessible_scopes: Vec<String>,
@@ -84,7 +88,7 @@ pub struct HintParams {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct FlowTrackingData {
     pub ap_tracking: ApTracking,
     #[serde(deserialize_with = "deserialize_map_to_string_and_usize_hashmap")]
@@ -100,6 +104,16 @@ impl ReferenceIds {
     }
     pub fn inner(&self) -> HashMap<String, u64> {
         self.0.clone()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl TypeInfo for ReferenceIds {
+    type Identity = Self;
+
+    fn type_info() -> Type {
+        Type::builder()
+            .path(Path::new("ReferenceIds", module_path!()))
+            .composite(Fields::unnamed().field(|f| f.ty::<[(String, u64)]>()))
     }
 }
 
@@ -126,7 +140,7 @@ impl Decode for ReferenceIds {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct ApTracking {
     pub group: u64,
     pub offset: u64,
@@ -148,7 +162,7 @@ impl Default for ApTracking {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Identifier {
     #[serde(
         rename(deserialize = "type", serialize = "type"),
@@ -180,6 +194,16 @@ pub struct Identifier {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Default)]
 pub struct Members(HashMap<String, Member>);
+#[cfg(feature = "scale-codec")]
+impl TypeInfo for Members {
+    type Identity = Self;
+
+    fn type_info() -> Type {
+        Type::builder()
+            .path(Path::new("Members", module_path!()))
+            .composite(Fields::unnamed().field(|f| f.ty::<[(String, Member)]>()))
+    }
+}
 
 impl Members {
     pub fn new() -> Self {
@@ -213,14 +237,14 @@ impl Decode for Members {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Member {
     pub cairo_type: String,
     pub offset: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Attribute {
     pub name: String,
     pub start_pc: u64,
@@ -231,7 +255,7 @@ pub struct Attribute {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Location {
     pub end_line: u32,
     pub end_col: u32,
@@ -247,20 +271,20 @@ pub struct DebugInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct InstructionLocation {
     pub inst: Location,
     pub hints: Vec<HintLocation>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct InputFile {
     pub filename: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct HintLocation {
     pub location: Location,
     pub n_prefix_newlines: u32,
@@ -308,7 +332,7 @@ pub struct ReferenceManager {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Reference {
     pub ap_tracking_data: ApTracking,
     pub pc: Option<u64>,
@@ -321,7 +345,7 @@ pub struct Reference {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub enum OffsetValue {
     Immediate(Felt252),
     Value(i32),
@@ -371,7 +395,7 @@ impl fmt::Display for OffsetValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct ValueAddress {
     pub offset1: OffsetValue,
     pub offset2: OffsetValue,

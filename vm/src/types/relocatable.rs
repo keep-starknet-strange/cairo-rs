@@ -11,16 +11,19 @@ use felt::Felt252;
 use num_traits::{ToPrimitive, Zero};
 #[cfg(feature = "scale-codec")]
 use parity_scale_codec::{Decode, Encode};
+#[cfg(feature = "scale-codec")]
+use scale_info::TypeInfo;
+
 use serde::{Deserialize, Serialize};
 #[derive(Eq, Ord, Hash, PartialEq, PartialOrd, Clone, Copy, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct Relocatable {
     pub segment_index: i64,
     pub offset: u64,
 }
 
 #[derive(Eq, Ord, Hash, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub enum MaybeRelocatable {
     RelocatableValue(Relocatable),
     Int(Felt252),

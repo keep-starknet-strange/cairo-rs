@@ -15,6 +15,8 @@ use super::builtin_hint_processor::builtin_hint_processor_definition::HintProces
 use felt::Felt252;
 #[cfg(feature = "scale-codec")]
 use parity_scale_codec::{Decode, Encode};
+#[cfg(feature = "scale-codec")]
+use scale_info::TypeInfo;
 
 pub trait HintProcessor {
     //Executes the hint which's data is provided by a dynamic structure previously created by compile_hint
@@ -79,7 +81,7 @@ fn get_ids_data(
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode, TypeInfo))]
 pub struct HintReference {
     pub offset1: OffsetValue,
     pub offset2: OffsetValue,

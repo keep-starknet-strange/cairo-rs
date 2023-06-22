@@ -9,7 +9,7 @@ description = "Field elements representation for the Cairo VM"
 default = ["std"]
 std = []
 alloc = []
-scale-codec = ["parity-scale-codec"]
+scale-codec = ["parity-scale-codec", "scale-info"]
 
 [dependencies]
 num-integer = { version = "0.1.45", default-features = false }
@@ -22,7 +22,8 @@ serde = { version = "1.0", features = ["derive"], default-features = false }
 
 hex = { workspace = true, default-features = false }
 
-parity-scale-codec = { version = "3.1.4", features = [
+scale-info = { workspace = true, optional = true }
+parity-scale-codec = { workspace = true, features = [
     "derive",
 ], default-features = false, optional = true }
 [dev-dependencies]
