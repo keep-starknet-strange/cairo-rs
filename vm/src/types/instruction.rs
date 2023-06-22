@@ -3,8 +3,11 @@ use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::vm::decoding::decoder::decode_instruction;
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub enum Register {
     AP,
     FP,

@@ -55,7 +55,7 @@ impl AddressSet {
 
         self.0
             .get(segment as usize)
-            .and_then(|segment| segment.get(addr.offset))
+            .and_then(|segment| segment.get(addr.offset as usize))
             .map(|bit| *bit)
             .unwrap_or(false)
     }
@@ -72,11 +72,11 @@ impl AddressSet {
             }
 
             let offset = addr.offset;
-            if offset >= self.0[segment].len() {
-                self.0[segment].resize(offset + 1, false);
+            if offset >= self.0[segment].len() as u64 {
+                self.0[segment].resize(offset as usize + 1, false);
             }
 
-            self.0[segment].insert(offset, true);
+            self.0[segment].insert(offset as usize, true);
         }
     }
 }
@@ -192,7 +192,7 @@ impl Memory {
 
         // Adjust the segment index to begin at zero, as per the struct field's
         match relocation_rules.get(&(-(segment_idx + 1) as usize)) {
-            Some(x) => (x + addr.offset).into(),
+            Some(x) => (x + addr.offset as usize).into(),
             None => addr.into(),
         }
     }
@@ -249,18 +249,20 @@ impl Memory {
     ) -> Result<(), MemoryError> {
         if src_ptr.segment_index >= 0 {
             return Err(MemoryError::AddressNotInTemporarySegment(
-                src_ptr.segment_index,
+                src_ptr.segment_index as isize,
             ));
         }
         if src_ptr.offset != 0 {
-            return Err(MemoryError::NonZeroOffset(src_ptr.offset));
+            return Err(MemoryError::NonZeroOffset(src_ptr.offset as usize));
         }
 
         // Adjust the segment index to begin at zero, as per the struct field's
         // comment.
         let segment_index = -(src_ptr.segment_index + 1) as usize;
         if self.relocation_rules.contains_key(&segment_index) {
-            return Err(MemoryError::DuplicatedRelocation(src_ptr.segment_index));
+            return Err(MemoryError::DuplicatedRelocation(
+                src_ptr.segment_index as isize,
+            ));
         }
 
         self.relocation_rules.insert(segment_index, dst_ptr);
@@ -368,8 +370,8 @@ impl Memory {
             }
         };
         match (
-            get_segment(lhs.segment_index),
-            get_segment(rhs.segment_index),
+            get_segment(lhs.segment_index as isize),
+            get_segment(rhs.segment_index as isize),
         ) {
             (None, None) => {
                 return (Ordering::Equal, 0);
@@ -384,8 +386,8 @@ impl Memory {
                 let (lhs_start, rhs_start) = (lhs.offset, rhs.offset);
                 for i in 0..len {
                     let (lhs, rhs) = (
-                        lhs_segment.get(lhs_start + i),
-                        rhs_segment.get(rhs_start + i),
+                        lhs_segment.get(lhs_start as usize + i),
+                        rhs_segment.get(rhs_start as usize + i),
                     );
                     let ord = lhs.cmp(&rhs);
                     if ord == Ordering::Equal {
@@ -418,8 +420,8 @@ impl Memory {
             }
         };
         match (
-            get_segment(lhs.segment_index).and_then(|s| s.get(lhs.offset..)),
-            get_segment(rhs.segment_index).and_then(|s| s.get(rhs.offset..)),
+            get_segment(lhs.segment_index as isize).and_then(|s| s.get(lhs.offset as usize..)),
+            get_segment(rhs.segment_index as isize).and_then(|s| s.get(rhs.offset as usize..)),
         ) {
             (Some(lhs), Some(rhs)) => {
                 let (lhs_len, rhs_len) = (lhs.len().min(len), rhs.len().min(len));
@@ -552,7 +554,7 @@ impl RelocateValue<'_, Relocatable, Relocatable> for Memory {
         // Adjust the segment index to begin at zero, as per the struct field's
         // comment.
         match self.relocation_rules.get(&(-(segment_idx + 1) as usize)) {
-            Some(x) => x + addr.offset,
+            Some(x) => x + addr.offset as usize,
             None => addr,
         }
     }

@@ -130,7 +130,7 @@ impl VirtualMachine {
         let new_fp_offset: usize = match instruction.fp_update {
             FpUpdate::APPlus2 => self.run_context.ap + 2,
             FpUpdate::Dst => match operands.dst {
-                MaybeRelocatable::RelocatableValue(ref rel) => rel.offset,
+                MaybeRelocatable::RelocatableValue(ref rel) => rel.offset as usize,
                 MaybeRelocatable::Int(ref num) => num
                     .to_usize()
                     .ok_or_else(|| MathError::Felt252ToUsizeConversion(Box::new(num.clone())))?,
@@ -148,7 +148,7 @@ impl VirtualMachine {
     ) -> Result<(), VirtualMachineError> {
         let new_apset: usize = match instruction.ap_update {
             ApUpdate::Add => match &operands.res {
-                Some(res) => (self.run_context.get_ap() + res)?.offset,
+                Some(res) => (self.run_context.get_ap() + res)?.offset as usize,
                 None => return Err(VirtualMachineError::UnconstrainedResAdd),
             },
             ApUpdate::Add1 => self.run_context.ap + 1,
@@ -277,7 +277,7 @@ impl VirtualMachine {
         address: Relocatable,
     ) -> Result<Option<MaybeRelocatable>, VirtualMachineError> {
         for builtin in self.builtin_runners.iter() {
-            if builtin.base() as isize == address.segment_index {
+            if builtin.base() as isize == address.segment_index as isize {
                 match builtin.deduce_memory_cell(address, &self.segments.memory) {
                     Ok(maybe_reloc) => return Ok(maybe_reloc),
                     Err(error) => return Err(VirtualMachineError::RunnerError(error)),
@@ -393,7 +393,7 @@ impl VirtualMachine {
 
         if let Some(ref mut trace) = &mut self.trace {
             trace.push(TraceEntry {
-                pc: self.run_context.pc.offset,
+                pc: self.run_context.pc.offset as usize,
                 ap: self.run_context.ap,
                 fp: self.run_context.fp,
             });
@@ -447,7 +447,7 @@ impl VirtualMachine {
         &mut self,
         hint_executor: &mut dyn HintProcessor,
         exec_scopes: &mut ExecutionScopes,
-        hint_data_dictionary: &HashMap<usize, Vec<Box<dyn Any>>>,
+        hint_data_dictionary: &HashMap<u64, Vec<Box<dyn Any>>>,
         constants: &HashMap<String, Felt252>,
         run_resources: &mut RunResources,
     ) -> Result<(), VirtualMachineError> {
@@ -465,9 +465,9 @@ impl VirtualMachine {
         let pc = self.run_context.pc.offset;
 
         let mut inst_cache = core::mem::take(&mut self.instruction_cache);
-        inst_cache.resize((pc + 1).max(inst_cache.len()), None);
+        inst_cache.resize((pc as usize + 1).max(inst_cache.len()), None);
 
-        let instruction = inst_cache.get_mut(pc).unwrap();
+        let instruction = inst_cache.get_mut(pc as usize).unwrap();
         if instruction.is_none() {
             *instruction = Some(self.decode_current_instruction()?);
         }
@@ -486,7 +486,7 @@ impl VirtualMachine {
         &mut self,
         hint_executor: &mut dyn HintProcessor,
         exec_scopes: &mut ExecutionScopes,
-        hint_data_dictionary: &HashMap<usize, Vec<Box<dyn Any>>>,
+        hint_data_dictionary: &HashMap<u64, Vec<Box<dyn Any>>>,
         constants: &HashMap<String, Felt252>,
         run_resources: &mut RunResources,
     ) -> Result<(), VirtualMachineError> {
@@ -3644,7 +3644,7 @@ mod tests {
     fn test_step_for_preset_memory_with_alloc_hint() {
         let mut vm = vm!(true);
         let hint_data_dictionary = HashMap::from([(
-            0_usize,
+            0,
             vec![any_box!(HintProcessorData::new_default(
                 "memory[ap] = segments.add()".to_string(),
                 HashMap::new(),
@@ -4239,7 +4239,7 @@ mod tests {
         fn before_first_step_hook(
             _vm: &mut VirtualMachine,
             _runner: &mut CairoRunner,
-            _hint_data: &HashMap<usize, Vec<Box<dyn Any>>>,
+            _hint_data: &HashMap<u64, Vec<Box<dyn Any>>>,
         ) -> Result<(), VirtualMachineError> {
             Err(VirtualMachineError::Unexpected)
         }

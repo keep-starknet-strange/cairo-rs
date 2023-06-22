@@ -130,7 +130,7 @@ fn apply_ap_tracking_correction(
         return None;
     }
     let ap_diff = hint_ap_tracking.offset - ref_ap_tracking.offset;
-    (ap - ap_diff).ok()
+    (ap - ap_diff as usize).ok()
 }
 
 //Tries to convert a Felt252 value to usize
@@ -164,7 +164,7 @@ fn get_offset_value_reference(
         apply_ap_tracking_correction(vm.get_ap(), var_ap_trackig, hint_ap_tracking)?
     };
 
-    if offset.is_negative() && base_addr.offset < offset.unsigned_abs() as usize {
+    if offset.is_negative() && base_addr.offset < offset.unsigned_abs() as u64 {
         return None;
     }
 

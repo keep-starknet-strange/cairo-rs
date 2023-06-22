@@ -121,7 +121,7 @@ pub fn search_sorted_lower(
         if value.as_ref() >= key.as_ref() {
             return insert_value_from_var_name("index", Felt252::new(i), vm, ids_data, ap_tracking);
         }
-        array_iter.offset += elm_size_usize;
+        array_iter.offset += elm_size_usize as u64;
     }
     insert_value_from_var_name("index", n_elms.into_owned(), vm, ids_data, ap_tracking)
 }

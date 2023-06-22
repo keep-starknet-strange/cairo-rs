@@ -153,7 +153,7 @@ impl CairoRunner {
             final_pc: None,
             program_base: None,
             execution_base: None,
-            entrypoint: program.shared_program_data.main,
+            entrypoint: program.shared_program_data.main.map(|val| val as usize),
             initial_ap: None,
             initial_fp: None,
             initial_pc: None,
@@ -360,7 +360,7 @@ impl CairoRunner {
         if let Some(prog_base) = self.program_base {
             let initial_pc = Relocatable {
                 segment_index: prog_base.segment_index,
-                offset: prog_base.offset + entrypoint,
+                offset: prog_base.offset + entrypoint as u64,
             };
             self.initial_pc = Some(initial_pc);
             vm.segments
@@ -400,7 +400,7 @@ impl CairoRunner {
         if let Some(base) = &self.execution_base {
             self.initial_fp = Some(Relocatable {
                 segment_index: base.segment_index,
-                offset: base.offset + stack.len(),
+                offset: base.offset + stack.len() as u64,
             });
             self.initial_ap = self.initial_fp;
         } else {
@@ -441,7 +441,7 @@ impl CairoRunner {
                 self.program
                     .shared_program_data
                     .start
-                    .ok_or(RunnerError::NoProgramStart)?,
+                    .ok_or(RunnerError::NoProgramStart)? as usize,
                 stack_prefix,
             )?;
             self.initial_fp = Some(
@@ -456,7 +456,7 @@ impl CairoRunner {
                     .program
                     .shared_program_data
                     .end
-                    .ok_or(RunnerError::NoProgramEnd)?);
+                    .ok_or(RunnerError::NoProgramEnd)? as usize);
         }
         let return_fp = vm.segments.add();
         if let Some(main) = &self.entrypoint {
@@ -474,8 +474,8 @@ impl CairoRunner {
 
     pub fn initialize_vm(&mut self, vm: &mut VirtualMachine) -> Result<(), RunnerError> {
         vm.run_context.pc = *self.initial_pc.as_ref().ok_or(RunnerError::NoPC)?;
-        vm.run_context.ap = self.initial_ap.as_ref().ok_or(RunnerError::NoAP)?.offset;
-        vm.run_context.fp = self.initial_fp.as_ref().ok_or(RunnerError::NoFP)?.offset;
+        vm.run_context.ap = self.initial_ap.as_ref().ok_or(RunnerError::NoAP)?.offset as usize;
+        vm.run_context.fp = self.initial_fp.as_ref().ok_or(RunnerError::NoFP)?.offset as usize;
         for builtin in vm.builtin_runners.iter() {
             builtin.add_validation_rule(&mut vm.segments.memory);
         }
@@ -495,14 +495,14 @@ impl CairoRunner {
         &self,
         references: &[HintReference],
         hint_executor: &mut dyn HintProcessor,
-    ) -> Result<HashMap<usize, Vec<Box<dyn Any>>>, VirtualMachineError> {
-        let mut hint_data_dictionary = HashMap::<usize, Vec<Box<dyn Any>>>::new();
-        for (hint_index, hints) in self.program.shared_program_data.hints.iter() {
+    ) -> Result<HashMap<u64, Vec<Box<dyn Any>>>, VirtualMachineError> {
+        let mut hint_data_dictionary = HashMap::<u64, Vec<Box<dyn Any>>>::new();
+        for (hint_index, hints) in self.program.shared_program_data.hints.inner().iter() {
             for hint in hints {
                 let hint_data = hint_executor.compile_hint(
                     &hint.code,
                     &hint.flow_tracking_data.ap_tracking,
-                    &hint.flow_tracking_data.reference_ids,
+                    &hint.flow_tracking_data.reference_ids.inner(),
                     references,
                 );
                 hint_data_dictionary
@@ -517,7 +517,7 @@ impl CairoRunner {
     }
 
     pub fn get_constants(&self) -> &HashMap<String, Felt252> {
-        &self.program.constants
+        self.program.constants.inner_ref()
     }
 
     pub fn get_program_builtins(&self) -> &Vec<BuiltinName> {
@@ -542,7 +542,7 @@ impl CairoRunner {
                 hint_processor,
                 &mut self.exec_scopes,
                 &hint_data_dictionary,
-                &self.program.constants,
+                &self.program.constants.inner(),
                 run_resources,
             )?;
             run_resources.consume_step()
@@ -574,7 +574,7 @@ impl CairoRunner {
                 hint_processor,
                 &mut self.exec_scopes,
                 &hint_data_dictionary,
-                &self.program.constants,
+                &self.program.constants.inner(),
                 &mut RunResources::default(),
             )?;
         }
@@ -868,7 +868,7 @@ impl CairoRunner {
             .ok_or(RunnerError::FinalizeSegmentsNoProofMode)?
             .iter()
         {
-            public_memory.push((elem + exec_base.offset, 0))
+            public_memory.push((elem + exec_base.offset as usize, 0))
         }
         vm.segments
             .finalize(None, exec_base.segment_index as usize, Some(&public_memory));
@@ -1011,9 +1011,11 @@ impl CairoRunner {
             self.program
                 .shared_program_data
                 .identifiers
+                .inner()
                 .get(&format!("__main__.{new_entrypoint}"))
                 .and_then(|x| x.pc)
-                .ok_or_else(|| ProgramError::EntrypointNotFound(new_entrypoint.to_string()))?,
+                .ok_or_else(|| ProgramError::EntrypointNotFound(new_entrypoint.to_string()))?
+                as usize,
         );
 
         Ok(())
@@ -1042,7 +1044,7 @@ impl CairoRunner {
             self.execution_public_memory
                 .as_mut()
                 .ok_or(RunnerError::NoExecPublicMemory)?
-                .extend(begin..end);
+                .extend(begin as usize..end as usize);
         }
         Ok(())
     }
@@ -1058,7 +1060,7 @@ impl CairoRunner {
         vm.builtin_runners.push(builtin);
 
         Relocatable {
-            segment_index,
+            segment_index: segment_index as i64,
             offset: 0,
         }
     }
@@ -4547,6 +4549,7 @@ mod tests {
         let main_entrypoint = program
             .shared_program_data
             .identifiers
+            .inner()
             .get("__main__.main")
             .unwrap()
             .pc
@@ -4556,7 +4559,7 @@ mod tests {
         cairo_runner.initialize_segments(&mut vm, None);
         assert_matches!(
             cairo_runner.run_from_entrypoint(
-                main_entrypoint,
+                main_entrypoint as usize,
                 &[
                     &mayberelocatable!(2).into(),
                     &MaybeRelocatable::from((2, 0)).into()
@@ -4580,6 +4583,7 @@ mod tests {
         let fib_entrypoint = program
             .shared_program_data
             .identifiers
+            .inner()
             .get("__main__.evaluate_fib")
             .unwrap()
             .pc
@@ -4587,7 +4591,7 @@ mod tests {
 
         assert_matches!(
             new_cairo_runner.run_from_entrypoint(
-                fib_entrypoint,
+                fib_entrypoint as usize,
                 &[
                     &mayberelocatable!(2).into(),
                     &MaybeRelocatable::from((2, 0)).into()
@@ -4618,6 +4622,7 @@ mod tests {
         let main_entrypoint = program
             .shared_program_data
             .identifiers
+            .inner()
             .get("__main__.main")
             .unwrap()
             .pc
@@ -4627,7 +4632,7 @@ mod tests {
 
         assert!(cairo_runner
             .run_from_entrypoint(
-                main_entrypoint,
+                main_entrypoint as usize,
                 &[
                     &MaybeRelocatable::from((2, 0)).into() //bitwise_ptr
                 ],
@@ -4738,6 +4743,7 @@ mod tests {
         let main_entrypoint = program
             .shared_program_data
             .identifiers
+            .inner()
             .get("__main__.main")
             .unwrap()
             .pc
@@ -4747,7 +4753,7 @@ mod tests {
         cairo_runner.initialize_segments(&mut vm, None);
 
         let result = cairo_runner.run_from_entrypoint(
-            main_entrypoint,
+            main_entrypoint as usize,
             &[],
             &mut RunResources::default(),
             true,

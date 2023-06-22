@@ -26,12 +26,12 @@ pub fn verify_ecdsa_signature(
         get_integer_from_var_name("signature_s", vm, ids_data, ap_tracking)?.into_owned();
     let ecdsa_ptr = get_ptr_from_var_name("ecdsa_ptr", vm, ids_data, ap_tracking)?;
     let ecdsa_builtin = &mut vm.get_signature_builtin()?;
-    if ecdsa_ptr.segment_index != ecdsa_builtin.base() as isize {
+    if ecdsa_ptr.segment_index != ecdsa_builtin.base() as i64 {
         return Err(HintError::AddSignatureWrongEcdsaPtr(Box::new(ecdsa_ptr)));
     }
     if !ecdsa_ptr
         .offset
-        .is_multiple_of(&(CELLS_PER_SIGNATURE as usize))
+        .is_multiple_of(&(CELLS_PER_SIGNATURE as u64))
     {
         return Err(HintError::AddSignatureNotAPublicKey(Box::new(ecdsa_ptr)));
     }

@@ -76,7 +76,7 @@ pub fn unsafe_keccak(
     for (word_i, byte_i) in (0..u64_length).step_by(16).enumerate() {
         let word_addr = Relocatable {
             segment_index: data.segment_index,
-            offset: data.offset + word_i,
+            offset: data.offset + word_i as u64,
         };
 
         let word = vm.get_integer(word_addr)?;

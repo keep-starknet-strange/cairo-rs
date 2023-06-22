@@ -66,14 +66,14 @@ impl PoseidonBuiltinRunner {
         address: Relocatable,
         memory: &Memory,
     ) -> Result<Option<MaybeRelocatable>, RunnerError> {
-        let index = address.offset % self.cells_per_instance as usize;
-        if index < self.n_input_cells as usize {
+        let index = address.offset % self.cells_per_instance as u64;
+        if index < self.n_input_cells as u64 {
             return Ok(None);
         }
         if let Some(felt) = self.cache.borrow().get(&address) {
             return Ok(Some(felt.into()));
         }
-        let first_input_addr = (address - index)?;
+        let first_input_addr = (address - index as usize)?;
         let first_output_addr = (first_input_addr + self.n_input_cells as usize)?;
 
         let mut input_felts = Vec::<FieldElement>::new();
@@ -137,7 +137,7 @@ impl PoseidonBuiltinRunner {
                 .memory
                 .get_relocatable(stop_pointer_addr)
                 .map_err(|_| RunnerError::NoStopPointer(Box::new(POSEIDON_BUILTIN_NAME)))?;
-            if self.base as isize != stop_pointer.segment_index {
+            if self.base as isize != stop_pointer.segment_index as isize {
                 return Err(RunnerError::InvalidStopPointerIndex(Box::new((
                     POSEIDON_BUILTIN_NAME,
                     stop_pointer,
@@ -147,14 +147,14 @@ impl PoseidonBuiltinRunner {
             let stop_ptr = stop_pointer.offset;
             let num_instances = self.get_used_instances(segments)?;
             let used = num_instances * self.cells_per_instance as usize;
-            if stop_ptr != used {
+            if stop_ptr != used as u64 {
                 return Err(RunnerError::InvalidStopPointer(Box::new((
                     POSEIDON_BUILTIN_NAME,
                     Relocatable::from((self.base as isize, used)),
-                    Relocatable::from((self.base as isize, stop_ptr)),
+                    Relocatable::from((self.base as isize, stop_ptr as usize)),
                 ))));
             }
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(stop_ptr as usize);
             Ok(stop_pointer_addr)
         } else {
             let stop_ptr = self.base;

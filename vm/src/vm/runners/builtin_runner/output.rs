@@ -83,7 +83,7 @@ impl OutputBuiltinRunner {
                 .memory
                 .get_relocatable(stop_pointer_addr)
                 .map_err(|_| RunnerError::NoStopPointer(Box::new(OUTPUT_BUILTIN_NAME)))?;
-            if self.base as isize != stop_pointer.segment_index {
+            if self.base as isize != stop_pointer.segment_index as isize {
                 return Err(RunnerError::InvalidStopPointerIndex(Box::new((
                     OUTPUT_BUILTIN_NAME,
                     stop_pointer,
@@ -92,14 +92,14 @@ impl OutputBuiltinRunner {
             }
             let stop_ptr = stop_pointer.offset;
             let used = self.get_used_cells(segments).map_err(RunnerError::Memory)?;
-            if stop_ptr != used {
+            if stop_ptr != used as u64 {
                 return Err(RunnerError::InvalidStopPointer(Box::new((
                     OUTPUT_BUILTIN_NAME,
                     Relocatable::from((self.base as isize, used)),
-                    Relocatable::from((self.base as isize, stop_ptr)),
+                    Relocatable::from((self.base as isize, stop_ptr as usize)),
                 ))));
             }
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(stop_ptr as usize);
             Ok(stop_pointer_addr)
         } else {
             let stop_ptr = self.base;

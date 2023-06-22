@@ -4,7 +4,6 @@ use crate::types::relocatable::Relocatable;
 use felt::Felt252;
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
-
 #[macro_export]
 macro_rules! relocatable {
     ($val1 : expr, $val2 : expr) => {
@@ -41,10 +40,13 @@ pub fn from_relocatable_to_indexes(relocatable: Relocatable) -> (usize, usize) {
     if relocatable.segment_index.is_negative() {
         (
             -(relocatable.segment_index + 1) as usize,
-            relocatable.offset,
+            relocatable.offset as usize,
         )
     } else {
-        (relocatable.segment_index as usize, relocatable.offset)
+        (
+            relocatable.segment_index as usize,
+            relocatable.offset as usize,
+        )
     }
 }
 
@@ -52,6 +54,10 @@ pub fn from_relocatable_to_indexes(relocatable: Relocatable) -> (usize, usize) {
 #[macro_use]
 pub mod test_utils {
     use crate::types::exec_scope::ExecutionScopes;
+    use crate::types::program::Constants;
+    use crate::types::program::Hints;
+    use crate::types::program::Identifiers;
+    use crate::types::program::InstructionLocations;
     use crate::types::relocatable::MaybeRelocatable;
     use crate::vm::trace::trace_entry::TraceEntry;
 
@@ -258,20 +264,20 @@ pub mod test_utils {
         ( $( $builtin_name: expr ),* ) => {{
             let shared_program_data = SharedProgramData {
                 data: crate::stdlib::vec::Vec::new(),
-                hints: crate::stdlib::collections::HashMap::new(),
+                hints: crate::types::program::Hints::new(),
                 main: None,
                 start: None,
                 end: None,
                 error_message_attributes: crate::stdlib::vec::Vec::new(),
                 instruction_locations: None,
-                identifiers: crate::stdlib::collections::HashMap::new(),
+                identifiers: crate::types::program::Identifiers::new(),
                 reference_manager: Program::get_reference_list(&ReferenceManager {
                     references: crate::stdlib::vec::Vec::new(),
                 }),
             };
             Program {
                 shared_program_data: Arc::new(shared_program_data),
-                constants: crate::stdlib::collections::HashMap::new(),
+                constants: crate::types::program::Constants::new(),
                 builtins: vec![$( $builtin_name ),*],
             }
         }};
@@ -293,18 +299,18 @@ pub mod test_utils {
     pub(crate) struct ProgramFlat {
         pub(crate) data: crate::utils::Vec<MaybeRelocatable>,
         pub(crate) hints: crate::stdlib::collections::HashMap<
-            usize,
+            u64,
             crate::utils::Vec<crate::serde::deserialize_program::HintParams>,
         >,
-        pub(crate) main: Option<usize>,
+        pub(crate) main: Option<u64>,
         //start and end labels will only be used in proof-mode
-        pub(crate) start: Option<usize>,
-        pub(crate) end: Option<usize>,
+        pub(crate) start: Option<u64>,
+        pub(crate) end: Option<u64>,
         pub(crate) error_message_attributes:
             crate::utils::Vec<crate::serde::deserialize_program::Attribute>,
         pub(crate) instruction_locations: Option<
             crate::stdlib::collections::HashMap<
-                usize,
+                u64,
                 crate::serde::deserialize_program::InstructionLocation,
             >,
         >,
@@ -345,16 +351,18 @@ pub mod test_utils {
             Program {
                 shared_program_data: Arc::new(SharedProgramData {
                     data: val.data,
-                    hints: val.hints,
+                    hints: Hints::from(val.hints),
                     main: val.main,
                     start: val.start,
                     end: val.end,
                     error_message_attributes: val.error_message_attributes,
-                    instruction_locations: val.instruction_locations,
-                    identifiers: val.identifiers,
+                    instruction_locations: val
+                        .instruction_locations
+                        .map(InstructionLocations::from),
+                    identifiers: Identifiers::from(val.identifiers),
                     reference_manager: Program::get_reference_list(&val.reference_manager),
                 }),
-                constants: val.constants,
+                constants: Constants::from(val.constants),
                 builtins: val.builtins,
             }
         }
@@ -606,6 +614,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod test {
     use crate::stdlib::{cell::RefCell, collections::HashMap, rc::Rc, string::String, vec::Vec};
+    use crate::types::program::{Constants, Hints, Identifiers};
     use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         hint_processor::{
@@ -928,20 +937,20 @@ mod test {
     fn program_macro() {
         let shared_data = SharedProgramData {
             data: Vec::new(),
-            hints: HashMap::new(),
+            hints: Hints::new(),
             main: None,
             start: None,
             end: None,
             error_message_attributes: Vec::new(),
             instruction_locations: None,
-            identifiers: HashMap::new(),
+            identifiers: Identifiers::new(),
             reference_manager: Program::get_reference_list(&ReferenceManager {
                 references: Vec::new(),
             }),
         };
         let program = Program {
             shared_program_data: Arc::new(shared_data),
-            constants: HashMap::new(),
+            constants: Constants::new(),
             builtins: Vec::new(),
         };
         assert_eq!(program, program!())
@@ -952,20 +961,20 @@ mod test {
     fn program_macro_with_builtin() {
         let shared_data = SharedProgramData {
             data: Vec::new(),
-            hints: HashMap::new(),
+            hints: Hints::new(),
             main: None,
             start: None,
             end: None,
             error_message_attributes: Vec::new(),
             instruction_locations: None,
-            identifiers: HashMap::new(),
+            identifiers: Identifiers::new(),
             reference_manager: Program::get_reference_list(&ReferenceManager {
                 references: Vec::new(),
             }),
         };
         let program = Program {
             shared_program_data: Arc::new(shared_data),
-            constants: HashMap::new(),
+            constants: Constants::new(),
             builtins: vec![BuiltinName::range_check],
         };
 
@@ -977,20 +986,20 @@ mod test {
     fn program_macro_custom_definition() {
         let shared_data = SharedProgramData {
             data: Vec::new(),
-            hints: HashMap::new(),
+            hints: Hints::new(),
             main: Some(2),
             start: None,
             end: None,
             error_message_attributes: Vec::new(),
             instruction_locations: None,
-            identifiers: HashMap::new(),
+            identifiers: Identifiers::new(),
             reference_manager: Program::get_reference_list(&ReferenceManager {
                 references: Vec::new(),
             }),
         };
         let program = Program {
             shared_program_data: Arc::new(shared_data),
-            constants: HashMap::new(),
+            constants: Constants::new(),
             builtins: vec![BuiltinName::range_check],
         };
 

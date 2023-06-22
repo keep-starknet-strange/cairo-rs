@@ -41,7 +41,7 @@ impl DictManagerExecScope {
         if self
             .trackers
             .insert(
-                dict_segment.segment_index,
+                dict_segment.segment_index as isize,
                 DictTrackerExecScope::new(self.trackers.len()),
             )
             .is_some()
@@ -57,7 +57,7 @@ impl DictManagerExecScope {
     /// Returns a reference for a dict tracker corresponding to a given pointer to a dict segment.
     fn get_dict_tracker(&self, dict_end: Relocatable) -> Result<&DictTrackerExecScope, HintError> {
         self.trackers
-            .get(&dict_end.segment_index)
+            .get(&(dict_end.segment_index as isize))
             .ok_or(HintError::CustomHint(
                 "The given value does not point to a known dictionary."
                     .to_string()
@@ -69,7 +69,7 @@ impl DictManagerExecScope {
     /// segment.
     fn get_dict_tracker_mut(&mut self, dict_end: Relocatable) -> &mut DictTrackerExecScope {
         self.trackers
-            .get_mut(&dict_end.segment_index)
+            .get_mut(&(dict_end.segment_index as isize))
             .expect("The given value does not point to a known dictionary.")
     }
 

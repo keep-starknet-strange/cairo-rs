@@ -168,7 +168,7 @@ impl RangeCheckBuiltinRunner {
                 .memory
                 .get_relocatable(stop_pointer_addr)
                 .map_err(|_| RunnerError::NoStopPointer(Box::new(RANGE_CHECK_BUILTIN_NAME)))?;
-            if self.base as isize != stop_pointer.segment_index {
+            if self.base as isize != stop_pointer.segment_index as isize {
                 return Err(RunnerError::InvalidStopPointerIndex(Box::new((
                     RANGE_CHECK_BUILTIN_NAME,
                     stop_pointer,
@@ -178,14 +178,14 @@ impl RangeCheckBuiltinRunner {
             let stop_ptr = stop_pointer.offset;
             let num_instances = self.get_used_instances(segments)?;
             let used = num_instances * self.cells_per_instance as usize;
-            if stop_ptr != used {
+            if stop_ptr != used as u64 {
                 return Err(RunnerError::InvalidStopPointer(Box::new((
                     RANGE_CHECK_BUILTIN_NAME,
                     Relocatable::from((self.base as isize, used)),
-                    Relocatable::from((self.base as isize, stop_ptr)),
+                    Relocatable::from((self.base as isize, stop_ptr as usize)),
                 ))));
             }
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(stop_ptr as usize);
             Ok(stop_pointer_addr)
         } else {
             let stop_ptr = self.base;

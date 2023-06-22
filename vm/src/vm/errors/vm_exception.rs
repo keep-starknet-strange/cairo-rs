@@ -33,15 +33,15 @@ impl VmException {
         error: VirtualMachineError,
     ) -> Self {
         let pc = vm.run_context.pc.offset;
-        let error_attr_value = get_error_attr_value(pc, runner, vm);
+        let error_attr_value = get_error_attr_value(pc as usize, runner, vm);
         let hint_index = if let VirtualMachineError::Hint(ref bx) = error {
             Some(bx.0)
         } else {
             None
         };
         VmException {
-            pc,
-            inst_location: get_location(pc, runner, hint_index),
+            pc: pc as usize,
+            inst_location: get_location(pc as usize, runner, hint_index),
             inner_exc: error,
             error_attr_value,
             traceback: get_traceback(vm, runner),
@@ -56,7 +56,7 @@ pub fn get_error_attr_value(
 ) -> Option<String> {
     let mut errors = String::new();
     for attribute in &runner.program.shared_program_data.error_message_attributes {
-        if attribute.start_pc <= pc && attribute.end_pc > pc {
+        if attribute.start_pc <= pc as u64 && attribute.end_pc > pc as u64 {
             errors.push_str(&format!(
                 "Error message: {}\n",
                 substitute_error_message_references(attribute, runner, vm)
@@ -75,12 +75,13 @@ pub fn get_location(
     runner: &CairoRunner,
     hint_index: Option<usize>,
 ) -> Option<Location> {
-    let instruction_location = runner
+    let instruction_locations = runner
         .program
         .shared_program_data
         .instruction_locations
         .as_ref()?
-        .get(&pc)?;
+        .inner();
+    let instruction_location = instruction_locations.get(&(pc as u64))?;
     if let Some(index) = hint_index {
         instruction_location
             .hints
@@ -95,10 +96,10 @@ pub fn get_location(
 pub fn get_traceback(vm: &VirtualMachine, runner: &CairoRunner) -> Option<String> {
     let mut traceback = String::new();
     for (_fp, traceback_pc) in vm.get_traceback_entries() {
-        if let Some(ref attr) = get_error_attr_value(traceback_pc.offset, runner, vm) {
+        if let Some(ref attr) = get_error_attr_value(traceback_pc.offset as usize, runner, vm) {
             traceback.push_str(attr)
         }
-        match get_location(traceback_pc.offset, runner, None) {
+        match get_location(traceback_pc.offset as usize, runner, None) {
             Some(location) => traceback.push_str(&format!(
                 "{}\n",
                 location.to_string_with_content(&format!("(pc=0:{})", traceback_pc.offset))
@@ -124,7 +125,7 @@ fn substitute_error_message_references(
     if let Some(tracking_data) = &error_message_attr.flow_tracking_data {
         let mut invalid_references = Vec::<String>::new();
         // Iterate over the available references and check if one of them is addressed in the error message
-        for (cairo_variable_path, ref_id) in &tracking_data.reference_ids {
+        for (cairo_variable_path, ref_id) in &tracking_data.reference_ids.inner() {
             // Get the cairo variable name from its path ie: __main__.main.x -> x
             let cairo_variable_name = match cairo_variable_path.rsplit('.').next() {
                 Some(string) => string,
@@ -137,7 +138,7 @@ fn substitute_error_message_references(
             if error_msg.contains(&formated_variable_name) {
                 // Get the value of the cairo variable from its reference id
                 match get_value_from_simple_reference(
-                    *ref_id,
+                    *ref_id as usize,
                     &tracking_data.ap_tracking,
                     runner,
                     vm,
@@ -344,7 +345,7 @@ mod test {
                 inner_exc: VirtualMachineError::NoImm,
                 error_attr_value: None,
                 traceback: None,
-            } if x == pc && y == location
+            } if x == pc as usize && y == location
         )
     }
 

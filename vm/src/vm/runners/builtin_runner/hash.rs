@@ -70,14 +70,11 @@ impl HashBuiltinRunner {
         address: Relocatable,
         memory: &Memory,
     ) -> Result<Option<MaybeRelocatable>, RunnerError> {
-        if address
-            .offset
-            .mod_floor(&(self.cells_per_instance as usize))
-            != 2
+        if address.offset.mod_floor(&(self.cells_per_instance as u64)) != 2
             || *self
                 .verified_addresses
                 .borrow()
-                .get(address.offset)
+                .get(address.offset as usize)
                 .unwrap_or(&false)
         {
             return Ok(None);
@@ -95,12 +92,12 @@ impl HashBuiltinRunner {
             num_a.as_ref().map(|x| x.as_ref()),
             num_b.as_ref().map(|x| x.as_ref()),
         ) {
-            if self.verified_addresses.borrow().len() <= address.offset {
+            if self.verified_addresses.borrow().len() <= address.offset as usize {
                 self.verified_addresses
                     .borrow_mut()
-                    .resize(address.offset + 1, false);
+                    .resize(address.offset as usize + 1, false);
             }
-            self.verified_addresses.borrow_mut()[address.offset] = true;
+            self.verified_addresses.borrow_mut()[address.offset as usize] = true;
 
             //Convert MaybeRelocatable to FieldElement
             let a_string = num_a.to_str_radix(10);
@@ -152,7 +149,7 @@ impl HashBuiltinRunner {
                 .memory
                 .get_relocatable(stop_pointer_addr)
                 .map_err(|_| RunnerError::NoStopPointer(Box::new(HASH_BUILTIN_NAME)))?;
-            if self.base as isize != stop_pointer.segment_index {
+            if self.base as isize != stop_pointer.segment_index as isize {
                 return Err(RunnerError::InvalidStopPointerIndex(Box::new((
                     HASH_BUILTIN_NAME,
                     stop_pointer,
@@ -162,14 +159,14 @@ impl HashBuiltinRunner {
             let stop_ptr = stop_pointer.offset;
             let num_instances = self.get_used_instances(segments)?;
             let used = num_instances * self.cells_per_instance as usize;
-            if stop_ptr != used {
+            if stop_ptr != used as u64 {
                 return Err(RunnerError::InvalidStopPointer(Box::new((
                     HASH_BUILTIN_NAME,
                     Relocatable::from((self.base as isize, used)),
-                    Relocatable::from((self.base as isize, stop_ptr)),
+                    Relocatable::from((self.base as isize, stop_ptr as usize)),
                 ))));
             }
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(stop_ptr as usize);
             Ok(stop_pointer_addr)
         } else {
             let stop_ptr = self.base;

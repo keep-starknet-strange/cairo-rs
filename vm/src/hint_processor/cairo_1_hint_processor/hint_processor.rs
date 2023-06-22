@@ -953,7 +953,7 @@ impl Cairo1HintProcessor {
             memory_exec_scope.next_address,
         )?;
 
-        memory_exec_scope.next_address.offset += object_size;
+        memory_exec_scope.next_address.offset += object_size as u64;
         Ok(())
     }
 
@@ -1058,7 +1058,7 @@ impl HintProcessor for Cairo1HintProcessor {
         _ap_tracking_data: &crate::serde::deserialize_program::ApTracking,
         //Map from variable name to reference id number
         //(may contain other variables aside from those used by the hint)
-        _reference_ids: &HashMap<String, usize>,
+        _reference_ids: &HashMap<String, u64>,
         //List of all references (key corresponds to element of the previous dictionary)
         _references: &[HintReference],
     ) -> Result<Box<dyn Any>, VirtualMachineError> {

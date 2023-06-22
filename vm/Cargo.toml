@@ -19,7 +19,12 @@ std = [
     "felt/std",
     "num-prime",
 ]
-cairo-1-hints = ["dep:cairo-lang-casm-contract-class", "dep:cairo-lang-casm", "dep:ark-ff", "dep:ark-std"]
+cairo-1-hints = [
+    "dep:cairo-lang-casm-contract-class",
+    "dep:cairo-lang-casm",
+    "dep:ark-ff",
+    "dep:ark-std",
+]
 
 
 # Note that these features are not retro-compatible with the cairo Python VM.
@@ -29,6 +34,7 @@ test_utils = [
 ] # This feature will reference every test-oriented feature
 skip_next_instruction_hint = []
 hooks = []
+scale-codec = ["parity-scale-codec"]
 
 [dependencies]
 mimalloc = { workspace = true, optional = true }
@@ -73,6 +79,11 @@ cairo-lang-casm-contract-class = { workspace = true, optional = true }
 # TODO: check these dependencies for wasm compatibility
 ark-ff = { workspace = true, optional = true }
 ark-std = { workspace = true, optional = true }
+
+# Dependencies for scale-codec feature
+parity-scale-codec = { version = "3.1.4", features = [
+    "derive",
+], default-features = false, optional = true }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

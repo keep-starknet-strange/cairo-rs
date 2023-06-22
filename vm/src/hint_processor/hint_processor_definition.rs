@@ -13,6 +13,8 @@ use crate::vm::vm_core::VirtualMachine;
 
 use super::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
 use felt::Felt252;
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 
 pub trait HintProcessor {
     //Executes the hint which's data is provided by a dynamic structure previously created by compile_hint
@@ -43,7 +45,7 @@ pub trait HintProcessor {
         ap_tracking_data: &ApTracking,
         //Map from variable name to reference id number
         //(may contain other variables aside from those used by the hint)
-        reference_ids: &HashMap<String, usize>,
+        reference_ids: &HashMap<String, u64>,
         //List of all references (key corresponds to element of the previous dictionary)
         references: &[HintReference],
     ) -> Result<Box<dyn Any>, VirtualMachineError> {
@@ -56,7 +58,7 @@ pub trait HintProcessor {
 }
 
 fn get_ids_data(
-    reference_ids: &HashMap<String, usize>,
+    reference_ids: &HashMap<String, u64>,
     references: &[HintReference],
 ) -> Result<HashMap<String, HintReference>, VirtualMachineError> {
     let mut ids_data = HashMap::<String, HintReference>::new();
@@ -68,7 +70,7 @@ fn get_ids_data(
         ids_data.insert(
             name.to_string(),
             references
-                .get(*ref_id)
+                .get(*ref_id as usize)
                 .ok_or(VirtualMachineError::Unexpected)?
                 .clone(),
         );
@@ -77,10 +79,11 @@ fn get_ids_data(
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct HintReference {
     pub offset1: OffsetValue,
     pub offset2: OffsetValue,
-    pub pc: Option<usize>,
+    pub pc: Option<u64>,
     pub dereference: bool,
     pub ap_tracking_data: Option<ApTracking>,
     pub cairo_type: Option<String>,

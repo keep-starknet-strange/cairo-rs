@@ -92,10 +92,10 @@ impl SegmentArenaBuiltinRunner {
                     stop_pointer,
                 ))));
             }
-            self.stop_ptr = Some(stop_pointer.offset);
+            self.stop_ptr = Some(stop_pointer.offset as usize);
             Ok(stop_pointer_addr)
         } else {
-            self.stop_ptr = Some(self.base.offset);
+            self.stop_ptr = Some(self.base.offset as usize);
             Ok(pointer)
         }
     }

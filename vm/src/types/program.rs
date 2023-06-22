@@ -2,7 +2,7 @@ use crate::serde::deserialize_program::{parse_program, ProgramJson, Reference, V
 use crate::stdlib::{collections::HashMap, prelude::*, sync::Arc};
 
 #[cfg(feature = "cairo-1-hints")]
-use crate::serde::deserialize_program::{ApTracking, FlowTrackingData};
+use crate::serde::deserialize_program::{ApTracking, FlowTrackingData, ReferenceIds};
 use crate::{
     hint_processor::hint_processor_definition::HintReference,
     serde::deserialize_program::{
@@ -14,6 +14,9 @@ use crate::{
 #[cfg(feature = "cairo-1-hints")]
 use cairo_lang_casm_contract_class::CasmContractClass;
 use felt::{Felt252, PRIME_STR};
+
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode, Error, Input, Output};
 
 #[cfg(feature = "std")]
 use std::path::Path;
@@ -40,24 +43,188 @@ use std::path::Path;
 // failures.
 // Fields in `Program` (other than `SharedProgramData` itself) are used by the main logic.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
-pub struct SharedProgramData {
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+pub(crate) struct SharedProgramData {
     pub(crate) data: Vec<MaybeRelocatable>,
-    pub(crate) hints: HashMap<usize, Vec<HintParams>>,
-    pub(crate) main: Option<usize>,
+    pub(crate) hints: Hints,
+    pub(crate) main: Option<u64>,
     //start and end labels will only be used in proof-mode
-    pub(crate) start: Option<usize>,
-    pub(crate) end: Option<usize>,
+    pub(crate) start: Option<u64>,
+    pub(crate) end: Option<u64>,
     pub(crate) error_message_attributes: Vec<Attribute>,
-    pub(crate) instruction_locations: Option<HashMap<usize, InstructionLocation>>,
-    pub(crate) identifiers: HashMap<String, Identifier>,
+    pub(crate) instruction_locations: Option<InstructionLocations>,
+    pub(crate) identifiers: Identifiers,
     pub(crate) reference_manager: Vec<HintReference>,
 }
 
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct Identifiers(HashMap<String, Identifier>);
+impl Identifiers {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn inner(&self) -> HashMap<String, Identifier> {
+        self.0.clone()
+    }
+    pub fn inner_ref(&self) -> &HashMap<String, Identifier> {
+        &self.0
+    }
+}
+
+impl From<HashMap<String, Identifier>> for Identifiers {
+    fn from(value: HashMap<String, Identifier>) -> Self {
+        Self(value)
+    }
+}
+
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Encode for Identifiers {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Convert the Identifiers to Vec<(String, Identifier)> to be
+        // able to use the Encode trait from this type.
+        let val: Vec<(String, Identifier)> = self.0.clone().into_iter().collect();
+        dest.write(&Encode::encode(&val));
+    }
+}
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Decode for Identifiers {
+    fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+        // Convert the Identifiers to Vec<(String, Identifier)> to be
+        // able to use the Decode trait from this type.
+        let val: Vec<(String, Identifier)> = Decode::decode(input)
+            .map_err(|_| Error::from("Can't get EntrypointMap from input buffer."))?;
+        Ok(Identifiers(HashMap::from_iter(val.into_iter())))
+    }
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct Hints(HashMap<u64, Vec<HintParams>>);
+impl Hints {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn inner(&self) -> HashMap<u64, Vec<HintParams>> {
+        self.0.clone()
+    }
+}
+
+impl From<HashMap<u64, Vec<HintParams>>> for Hints {
+    fn from(value: HashMap<u64, Vec<HintParams>>) -> Self {
+        Self(value)
+    }
+}
+
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Encode for Hints {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Convert the Hints to Vec<(u64, Vec<HintParams>)> to be
+        // able to use the Encode trait from this type.
+        let val: Vec<(u64, Vec<HintParams>)> = self.0.clone().into_iter().collect();
+        dest.write(&Encode::encode(&val));
+    }
+}
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Decode for Hints {
+    fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+        // Convert the Hints to Vec<(u64, Vec<HintParams>)> to be
+        // able to use the Decode trait from this type.
+        let val: Vec<(u64, Vec<HintParams>)> = Decode::decode(input)
+            .map_err(|_| Error::from("Can't get EntrypointMap from input buffer."))?;
+        Ok(Hints(HashMap::from_iter(val.into_iter())))
+    }
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct InstructionLocations(HashMap<u64, InstructionLocation>);
+impl InstructionLocations {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn inner(&self) -> HashMap<u64, InstructionLocation> {
+        self.0.clone()
+    }
+}
+
+impl From<HashMap<u64, InstructionLocation>> for InstructionLocations {
+    fn from(value: HashMap<u64, InstructionLocation>) -> Self {
+        Self(value)
+    }
+}
+
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Encode for InstructionLocations {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Convert the InstructionLocations to Vec<(u64, InstructionLocation)> to be
+        // able to use the Encode trait from this type.
+        let val: Vec<(u64, InstructionLocation)> = self.0.clone().into_iter().collect();
+        dest.write(&Encode::encode(&val));
+    }
+}
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Decode for InstructionLocations {
+    fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+        // Convert the InstructionLocations to Vec<(u64, InstructionLocation)> to be
+        // able to use the Decode trait from this type.
+        let val: Vec<(u64, InstructionLocation)> = Decode::decode(input)
+            .map_err(|_| Error::from("Can't get EntrypointMap from input buffer."))?;
+        Ok(InstructionLocations(HashMap::from_iter(val.into_iter())))
+    }
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct Constants(HashMap<String, Felt252>);
+impl Constants {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn inner(&self) -> HashMap<String, Felt252> {
+        self.0.clone()
+    }
+    pub fn inner_ref(&self) -> &HashMap<String, Felt252> {
+        &self.0
+    }
+}
+
+impl From<HashMap<String, Felt252>> for Constants {
+    fn from(value: HashMap<String, Felt252>) -> Self {
+        Self(value)
+    }
+}
+
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Encode for Constants {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Convert the Constants to Vec<(String, Felt252)> to be
+        // able to use the Encode trait from this type.
+        let val: Vec<(String, Felt252)> = self.0.clone().into_iter().collect();
+        dest.write(&Encode::encode(&val));
+    }
+}
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Decode for Constants {
+    fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+        // Convert the Constants to Vec<(String, Felt252)> to be
+        // able to use the Decode trait from this type.
+        let val: Vec<(String, Felt252)> = Decode::decode(input)
+            .map_err(|_| Error::from("Can't get EntrypointMap from input buffer."))?;
+        Ok(Constants(HashMap::from_iter(val.into_iter())))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct Program {
-    pub shared_program_data: Arc<SharedProgramData>,
-    pub constants: HashMap<String, Felt252>,
-    pub builtins: Vec<BuiltinName>,
+    pub(crate) shared_program_data: Arc<SharedProgramData>,
+    pub(crate) constants: Constants,
+    pub(crate) builtins: Vec<BuiltinName>,
 }
 
 impl Program {
@@ -65,12 +232,12 @@ impl Program {
     pub fn new(
         builtins: Vec<BuiltinName>,
         data: Vec<MaybeRelocatable>,
-        main: Option<usize>,
-        hints: HashMap<usize, Vec<HintParams>>,
+        main: Option<u64>,
+        hints: HashMap<u64, Vec<HintParams>>,
         reference_manager: ReferenceManager,
         identifiers: HashMap<String, Identifier>,
         error_message_attributes: Vec<Attribute>,
-        instruction_locations: Option<HashMap<usize, InstructionLocation>>,
+        instruction_locations: Option<HashMap<u64, InstructionLocation>>,
     ) -> Result<Program, ProgramError> {
         let mut constants = HashMap::new();
         for (key, value) in identifiers.iter() {
@@ -84,18 +251,18 @@ impl Program {
         }
         let shared_program_data = SharedProgramData {
             data,
-            hints,
+            hints: Hints::from(hints),
             main,
             start: None,
             end: None,
             error_message_attributes,
-            instruction_locations,
-            identifiers,
+            instruction_locations: instruction_locations.map(InstructionLocations::from),
+            identifiers: Identifiers::from(identifiers),
             reference_manager: Self::get_reference_list(&reference_manager),
         };
         Ok(Self {
             shared_program_data: Arc::new(shared_program_data),
-            constants,
+            constants: Constants::from(constants),
             builtins,
         })
     }
@@ -137,12 +304,13 @@ impl Program {
     }
 
     pub fn get_identifier(&self, id: &str) -> Option<&Identifier> {
-        self.shared_program_data.identifiers.get(id)
+        self.shared_program_data.identifiers.inner_ref().get(id)
     }
 
     pub fn iter_identifiers(&self) -> impl Iterator<Item = (&str, &Identifier)> {
         self.shared_program_data
             .identifiers
+            .inner_ref()
             .iter()
             .map(|(cairo_type, identifier)| (cairo_type.as_str(), identifier))
     }
@@ -165,19 +333,19 @@ impl Program {
         &self.shared_program_data.data
     }
 
-    pub fn hints(&self) -> &HashMap<usize, Vec<HintParams>> {
+    pub fn hints(&self) -> &Hints {
         &self.shared_program_data.hints
     }
 
-    pub fn main(&self) -> &Option<usize> {
+    pub fn main(&self) -> &Option<u64> {
         &self.shared_program_data.main
     }
 
-    pub fn start(&self) -> &Option<usize> {
+    pub fn start(&self) -> &Option<u64> {
         &self.shared_program_data.start
     }
 
-    pub fn end(&self) -> &Option<usize> {
+    pub fn end(&self) -> &Option<u64> {
         &self.shared_program_data.end
     }
 
@@ -185,15 +353,15 @@ impl Program {
         &self.shared_program_data.error_message_attributes
     }
 
-    pub fn instruction_locations(&self) -> &Option<HashMap<usize, InstructionLocation>> {
+    pub fn instruction_locations(&self) -> &Option<InstructionLocations> {
         &self.shared_program_data.instruction_locations
     }
 
-    pub fn identifiers(&self) -> &HashMap<String, Identifier> {
+    pub fn identifiers(&self) -> &Identifiers {
         &self.shared_program_data.identifiers
     }
 
-    pub fn constants(&self) -> &HashMap<String, Felt252> {
+    pub fn constants(&self) -> &Constants {
         &self.constants
     }
 
@@ -222,7 +390,7 @@ impl Default for Program {
     fn default() -> Self {
         Self {
             shared_program_data: Arc::new(SharedProgramData::default()),
-            constants: HashMap::new(),
+            constants: Constants::new(),
             builtins: Vec::new(),
         }
     }
@@ -238,20 +406,20 @@ impl TryFrom<CasmContractClass> for Program {
             .iter()
             .map(|x| MaybeRelocatable::from(Felt252::from(&x.value)))
             .collect();
-        //Hint data is going to be hosted processor-side, hints field will only store the pc where hints are located.
+        // Hint data is going to be hosted processor-side, hints field will only store the pc where hints are located.
         // Only one pc will be stored, so the hint processor will be responsible for executing all hints for a given pc
         let hints = value
             .hints
             .iter()
             .map(|(x, _)| {
                 (
-                    *x,
+                    *x as u64,
                     vec![HintParams {
                         code: x.to_string(),
                         accessible_scopes: Vec::new(),
                         flow_tracking_data: FlowTrackingData {
                             ap_tracking: ApTracking::default(),
-                            reference_ids: HashMap::new(),
+                            reference_ids: ReferenceIds::new(),
                         },
                     }],
                 )
@@ -277,7 +445,7 @@ impl TryFrom<CasmContractClass> for Program {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::serde::deserialize_program::{ApTracking, FlowTrackingData};
+    use crate::serde::deserialize_program::{ApTracking, FlowTrackingData, Members};
     use crate::utils::test_utils::*;
     use felt::felt_str;
     use num_traits::Zero;
@@ -351,7 +519,7 @@ mod tests {
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
-        assert_eq!(program.shared_program_data.identifiers, HashMap::new());
+        assert_eq!(program.shared_program_data.identifiers, Identifiers::new());
     }
 
     #[test]
@@ -421,13 +589,18 @@ mod tests {
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
-        assert_eq!(program.shared_program_data.identifiers, identifiers);
+        assert_eq!(
+            program.shared_program_data.identifiers,
+            Identifiers::from(identifiers)
+        );
         assert_eq!(
             program.constants,
-            [("__main__.main.SIZEOF_LOCALS", Felt252::zero())]
-                .into_iter()
-                .map(|(key, value)| (key.to_string(), value))
-                .collect::<HashMap<_, _>>(),
+            Constants::from(
+                [("__main__.main.SIZEOF_LOCALS", Felt252::zero())]
+                    .into_iter()
+                    .map(|(key, value)| (key.to_string(), value))
+                    .collect::<HashMap<_, _>>()
+            ),
         );
     }
 
@@ -798,7 +971,7 @@ mod tests {
                 type_: Some(String::from("struct")),
                 value: None,
                 full_name: Some("__main__.main.Args".to_string()),
-                members: Some(HashMap::new()),
+                members: Some(Members::new()),
                 cairo_type: None,
                 decorators: None,
                 size: Some(0),
@@ -813,7 +986,7 @@ mod tests {
                 type_: Some(String::from("struct")),
                 value: None,
                 full_name: Some("__main__.main.ImplicitArgs".to_string()),
-                members: Some(HashMap::new()),
+                members: Some(Members::new()),
                 cairo_type: None,
                 decorators: None,
                 size: Some(0),
@@ -828,7 +1001,7 @@ mod tests {
                 type_: Some(String::from("struct")),
                 value: None,
                 full_name: Some("__main__.main.Return".to_string()),
-                members: Some(HashMap::new()),
+                members: Some(Members::new()),
                 cairo_type: None,
                 decorators: None,
                 size: Some(0),
@@ -855,7 +1028,10 @@ mod tests {
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, Some(0));
-        assert_eq!(program.shared_program_data.identifiers, identifiers);
+        assert_eq!(
+            program.shared_program_data.identifiers,
+            Identifiers::from(identifiers)
+        );
     }
 
     /// Deserialize a program without an entrypoint.
@@ -880,7 +1056,7 @@ mod tests {
                     group: 14,
                     offset: 35,
                 },
-                reference_ids: HashMap::new(),
+                reference_ids: ReferenceIds::new(),
             }),
             accessible_scopes: vec![
                 "openzeppelin.security.safemath.library".to_string(),
@@ -922,7 +1098,7 @@ mod tests {
                 type_: Some(String::from("struct")),
                 value: None,
                 full_name: Some("__main__.main.Args".to_string()),
-                members: Some(HashMap::new()),
+                members: Some(Members::new()),
                 cairo_type: None,
                 decorators: None,
                 size: Some(0),
@@ -937,7 +1113,7 @@ mod tests {
                 type_: Some(String::from("struct")),
                 value: None,
                 full_name: Some("__main__.main.ImplicitArgs".to_string()),
-                members: Some(HashMap::new()),
+                members: Some(Members::new()),
                 cairo_type: None,
                 decorators: None,
                 size: Some(0),
@@ -952,7 +1128,7 @@ mod tests {
                 type_: Some(String::from("struct")),
                 value: None,
                 full_name: Some("__main__.main.Return".to_string()),
-                members: Some(HashMap::new()),
+                members: Some(Members::new()),
                 cairo_type: None,
                 decorators: None,
                 size: Some(0),
@@ -979,7 +1155,10 @@ mod tests {
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
-        assert_eq!(program.shared_program_data.identifiers, identifiers);
+        assert_eq!(
+            program.shared_program_data.identifiers,
+            Identifiers::from(identifiers)
+        );
         assert_eq!(
             program.shared_program_data.error_message_attributes,
             error_message_attributes
@@ -1024,7 +1203,7 @@ mod tests {
         .map(|(key, value)| (key.to_string(), value))
         .collect::<HashMap<_, _>>();
 
-        assert_eq!(program.constants, constants);
+        assert_eq!(program.constants, Constants::from(constants));
     }
 
     #[test]
@@ -1032,20 +1211,20 @@ mod tests {
     fn default_program() {
         let shared_program_data = SharedProgramData {
             data: Vec::new(),
-            hints: HashMap::new(),
+            hints: Hints::new(),
             main: None,
             start: None,
             end: None,
             error_message_attributes: Vec::new(),
             instruction_locations: None,
-            identifiers: HashMap::new(),
+            identifiers: Identifiers::new(),
             reference_manager: Program::get_reference_list(&ReferenceManager {
                 references: Vec::new(),
             }),
         };
         let program = Program {
             shared_program_data: Arc::new(shared_program_data),
-            constants: HashMap::new(),
+            constants: Constants::new(),
             builtins: Vec::new(),
         };
 

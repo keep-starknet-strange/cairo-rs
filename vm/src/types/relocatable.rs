@@ -9,15 +9,18 @@ use crate::{
 };
 use felt::Felt252;
 use num_traits::{ToPrimitive, Zero};
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-
 #[derive(Eq, Ord, Hash, PartialEq, PartialOrd, Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct Relocatable {
-    pub segment_index: isize,
-    pub offset: usize,
+    pub segment_index: i64,
+    pub offset: u64,
 }
 
 #[derive(Eq, Ord, Hash, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub enum MaybeRelocatable {
     RelocatableValue(Relocatable),
     Int(Felt252),
@@ -26,8 +29,8 @@ pub enum MaybeRelocatable {
 impl From<(isize, usize)> for Relocatable {
     fn from(index_offset: (isize, usize)) -> Self {
         Relocatable {
-            segment_index: index_offset.0,
-            offset: index_offset.1,
+            segment_index: index_offset.0 as i64,
+            offset: index_offset.1 as u64,
         }
     }
 }
@@ -93,8 +96,8 @@ impl Add<usize> for Relocatable {
     type Output = Result<Relocatable, MathError>;
     fn add(self, other: usize) -> Result<Self, MathError> {
         self.offset
-            .checked_add(other)
-            .map(|x| Relocatable::from((self.segment_index, x)))
+            .checked_add(other as u64)
+            .map(|x| Relocatable::from((self.segment_index as isize, x as usize)))
             .ok_or_else(|| MathError::RelocatableAddUsizeOffsetExceeded(Box::new((self, other))))
     }
 }
@@ -102,7 +105,7 @@ impl Add<usize> for Relocatable {
 /// Warning: may panic if self.offset + rhs exceeds usize::MAX
 impl AddAssign<usize> for Relocatable {
     fn add_assign(&mut self, rhs: usize) {
-        self.offset += rhs
+        self.offset += rhs as u64
     }
 }
 
@@ -119,12 +122,12 @@ impl Add<i32> for Relocatable {
 impl Add<&Felt252> for Relocatable {
     type Output = Result<Relocatable, MathError>;
     fn add(self, other: &Felt252) -> Result<Relocatable, MathError> {
-        let new_offset = (self.offset as u64 + other)
+        let new_offset = (self.offset + other)
             .and_then(|x| x.to_usize())
             .ok_or_else(|| {
                 MathError::RelocatableAddFelt252OffsetExceeded(Box::new((self, other.clone())))
             })?;
-        Ok((self.segment_index, new_offset).into())
+        Ok((self.segment_index as isize, new_offset).into())
     }
 }
 
@@ -146,10 +149,10 @@ impl Add<&MaybeRelocatable> for Relocatable {
 impl Sub<usize> for Relocatable {
     type Output = Result<Relocatable, MathError>;
     fn sub(self, other: usize) -> Result<Self, MathError> {
-        if self.offset < other {
+        if self.offset < other as u64 {
             return Err(MathError::RelocatableSubNegOffset(Box::new((self, other))));
         }
-        let new_offset = self.offset - other;
+        let new_offset = self.offset - other as u64;
         Ok(relocatable!(self.segment_index, new_offset))
     }
 }
@@ -163,11 +166,11 @@ impl Sub<Relocatable> for Relocatable {
         if self.offset < other.offset {
             return Err(MathError::RelocatableSubNegOffset(Box::new((
                 self,
-                other.offset,
+                other.offset as usize,
             ))));
         }
         let result = self.offset - other.offset;
-        Ok(result)
+        Ok(result as usize)
     }
 }
 
@@ -211,7 +214,7 @@ impl MaybeRelocatable {
                 })?;
                 Ok(MaybeRelocatable::RelocatableValue(Relocatable {
                     segment_index: rel.segment_index,
-                    offset: new_offset,
+                    offset: new_offset as u64,
                 }))
             }
         }
@@ -266,8 +269,8 @@ impl MaybeRelocatable {
             }
             (MaybeRelocatable::RelocatableValue(rel_a), MaybeRelocatable::Int(ref num_b)) => {
                 Ok(MaybeRelocatable::from((
-                    rel_a.segment_index,
-                    (rel_a.offset - num_b).to_usize().ok_or_else(|| {
+                    rel_a.segment_index as isize,
+                    (rel_a.offset as usize - num_b).to_usize().ok_or_else(|| {
                         MathError::RelocatableAddFelt252OffsetExceeded(Box::new((
                             *rel_a,
                             num_b.clone(),
@@ -323,7 +326,7 @@ impl<'a> Add<usize> for &'a Relocatable {
     fn add(self, other: usize) -> Self::Output {
         Relocatable {
             segment_index: self.segment_index,
-            offset: self.offset + other,
+            offset: self.offset + other as u64,
         }
     }
 }
@@ -353,7 +356,7 @@ pub fn relocate_address(
         (relocatable.segment_index as usize, relocatable.offset)
     } else {
         return Err(MemoryError::TemporarySegmentInRelocation(
-            relocatable.segment_index,
+            relocatable.segment_index as isize,
         ));
     };
 
@@ -361,7 +364,7 @@ pub fn relocate_address(
         return Err(MemoryError::Relocation);
     }
 
-    Ok(relocation_table[segment_index] + offset)
+    Ok(relocation_table[segment_index] + offset as usize)
 }
 
 #[cfg(test)]

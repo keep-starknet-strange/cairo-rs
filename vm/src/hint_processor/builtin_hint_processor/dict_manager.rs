@@ -71,14 +71,14 @@ impl DictManager {
         initial_dict: HashMap<MaybeRelocatable, MaybeRelocatable>,
     ) -> Result<MaybeRelocatable, HintError> {
         let base = vm.add_memory_segment();
-        if self.trackers.contains_key(&base.segment_index) {
+        if self.trackers.contains_key(&(base.segment_index as isize)) {
             return Err(HintError::CantCreateDictionaryOnTakenSegment(
-                base.segment_index,
+                base.segment_index as isize,
             ));
         };
 
         self.trackers.insert(
-            base.segment_index,
+            base.segment_index as isize,
             DictTracker::new_with_initial(base, initial_dict),
         );
         Ok(MaybeRelocatable::RelocatableValue(base))
@@ -92,13 +92,13 @@ impl DictManager {
         initial_dict: Option<HashMap<MaybeRelocatable, MaybeRelocatable>>,
     ) -> Result<MaybeRelocatable, HintError> {
         let base = vm.add_memory_segment();
-        if self.trackers.contains_key(&base.segment_index) {
+        if self.trackers.contains_key(&(base.segment_index as isize)) {
             return Err(HintError::CantCreateDictionaryOnTakenSegment(
-                base.segment_index,
+                base.segment_index as isize,
             ));
         }
         self.trackers.insert(
-            base.segment_index,
+            base.segment_index as isize,
             DictTracker::new_default_dict(base, default_value, initial_dict),
         );
         Ok(MaybeRelocatable::RelocatableValue(base))
@@ -111,8 +111,8 @@ impl DictManager {
     ) -> Result<&mut DictTracker, HintError> {
         let tracker = self
             .trackers
-            .get_mut(&dict_ptr.segment_index)
-            .ok_or(HintError::NoDictTracker(dict_ptr.segment_index))?;
+            .get_mut(&(dict_ptr.segment_index as isize))
+            .ok_or(HintError::NoDictTracker(dict_ptr.segment_index as isize))?;
         if tracker.current_ptr != dict_ptr {
             return Err(HintError::MismatchedDictPtr(Box::new((
                 tracker.current_ptr,
@@ -126,8 +126,8 @@ impl DictManager {
     pub fn get_tracker(&self, dict_ptr: Relocatable) -> Result<&DictTracker, HintError> {
         let tracker = self
             .trackers
-            .get(&dict_ptr.segment_index)
-            .ok_or(HintError::NoDictTracker(dict_ptr.segment_index))?;
+            .get(&(dict_ptr.segment_index as isize))
+            .ok_or(HintError::NoDictTracker(dict_ptr.segment_index as isize))?;
         if tracker.current_ptr != dict_ptr {
             return Err(HintError::MismatchedDictPtr(Box::new((
                 tracker.current_ptr,

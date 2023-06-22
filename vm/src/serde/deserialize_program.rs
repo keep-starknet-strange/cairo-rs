@@ -1,5 +1,7 @@
 use crate::stdlib::{collections::HashMap, fmt, prelude::*, sync::Arc};
 
+use crate::serde::serialize_program::serialize_value_address;
+use crate::types::program::{Constants, Hints, Identifiers, InstructionLocations};
 use crate::vm::runners::builtin_runner::SEGMENT_ARENA_BUILTIN_NAME;
 use crate::{
     serde::{deserialize_utils, serialize_program::number_from_felt},
@@ -18,14 +20,15 @@ use crate::{
 use felt::{Felt252, PRIME_STR};
 use num_traits::float::FloatCore;
 use num_traits::{Num, Pow, Zero};
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode, Error, Input, Output};
 use serde::{de, de::MapAccess, de::SeqAccess, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
-
-use super::serialize_program::serialize_value_address;
-
 // This enum is used to deserialize program builtins into &str and catch non-valid names
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone, Eq, Hash)]
 #[allow(non_camel_case_types)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+
 pub enum BuiltinName {
     output,
     range_check,
@@ -64,7 +67,7 @@ pub struct ProgramJson {
     )]
     pub data: Vec<MaybeRelocatable>,
     pub identifiers: HashMap<String, Identifier>,
-    pub hints: HashMap<usize, Vec<HintParams>>,
+    pub hints: HashMap<u64, Vec<HintParams>>,
     pub reference_manager: ReferenceManager,
     pub attributes: Vec<Attribute>,
     pub debug_info: Option<DebugInfo>,
@@ -73,6 +76,7 @@ pub struct ProgramJson {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct HintParams {
     pub code: String,
     pub accessible_scopes: Vec<String>,
@@ -80,16 +84,52 @@ pub struct HintParams {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct FlowTrackingData {
     pub ap_tracking: ApTracking,
     #[serde(deserialize_with = "deserialize_map_to_string_and_usize_hashmap")]
-    pub reference_ids: HashMap<String, usize>,
+    pub reference_ids: ReferenceIds,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+pub struct ReferenceIds(HashMap<String, u64>);
+
+impl ReferenceIds {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn inner(&self) -> HashMap<String, u64> {
+        self.0.clone()
+    }
+}
+
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Encode for ReferenceIds {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Convert the EntrypointMapWrapper to Vec<(String, u64)> to be
+        // able to use the Encode trait from this type.
+        let val: Vec<(String, u64)> = self.0.clone().into_iter().collect();
+        dest.write(&Encode::encode(&val));
+    }
+}
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Decode for ReferenceIds {
+    fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+        // Convert the EntrypointMapWrapper to Vec<(String, u64)> to be
+        // able to use the Decode trait from this type.
+        let val: Vec<(String, u64)> = Decode::decode(input)
+            .map_err(|_| Error::from("Can't get EntrypointMap from input buffer."))?;
+        Ok(ReferenceIds(HashMap::from_iter(val.into_iter())))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct ApTracking {
-    pub group: usize,
-    pub offset: usize,
+    pub group: u64,
+    pub offset: u64,
 }
 
 impl ApTracking {
@@ -108,13 +148,14 @@ impl Default for ApTracking {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct Identifier {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pc: Option<usize>,
     #[serde(
         rename(deserialize = "type", serialize = "type"),
         skip_serializing_if = "Option::is_none"
     )]
+    pub pc: Option<u64>,
+    #[serde(rename(deserialize = "type"))]
     pub type_: Option<String>,
     #[serde(default)]
     #[serde(
@@ -125,9 +166,7 @@ pub struct Identifier {
     pub value: Option<Felt252>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub full_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub members: Option<HashMap<String, Member>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub members: Option<Members>,
     pub cairo_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decorators: Option<Vec<String>>,
@@ -139,23 +178,60 @@ pub struct Identifier {
     pub references: Option<Vec<Reference>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Member {
-    pub cairo_type: String,
-    pub offset: usize,
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Default)]
+pub struct Members(HashMap<String, Member>);
+
+impl Members {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+    pub fn inner(&self) -> HashMap<String, Member> {
+        self.0.clone()
+    }
+}
+
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Encode for Members {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Convert the Members to Vec<(String, u64)> to be
+        // able to use the Encode trait from this type.
+        let val: Vec<(String, Member)> = self.0.clone().into_iter().collect();
+        dest.write(&Encode::encode(&val));
+    }
+}
+/// SCALE trait.
+#[cfg(feature = "scale-codec")]
+impl Decode for Members {
+    fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+        // Convert the Members to Vec<(String, Member)> to be
+        // able to use the Decode trait from this type.
+        let val: Vec<(String, Member)> = Decode::decode(input)
+            .map_err(|_| Error::from("Can't get EntrypointMap from input buffer."))?;
+        Ok(Members(HashMap::from_iter(val.into_iter())))
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
+pub struct Member {
+    pub cairo_type: String,
+    pub offset: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct Attribute {
     pub name: String,
-    pub start_pc: usize,
-    pub end_pc: usize,
+    pub start_pc: u64,
+    pub end_pc: u64,
     pub value: String,
     pub flow_tracking_data: Option<FlowTrackingData>,
     pub accessible_scopes: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct Location {
     pub end_line: u32,
     pub end_col: u32,
@@ -167,21 +243,24 @@ pub struct Location {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct DebugInfo {
-    instruction_locations: HashMap<usize, InstructionLocation>,
+    instruction_locations: HashMap<u64, InstructionLocation>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct InstructionLocation {
     pub inst: Location,
     pub hints: Vec<HintLocation>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct InputFile {
     pub filename: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct HintLocation {
     pub location: Location,
     pub n_prefix_newlines: u32,
@@ -229,9 +308,10 @@ pub struct ReferenceManager {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct Reference {
     pub ap_tracking_data: ApTracking,
-    pub pc: Option<usize>,
+    pub pc: Option<u64>,
     #[serde(
         deserialize_with = "deserialize_value_address",
         serialize_with = "serialize_value_address"
@@ -241,6 +321,7 @@ pub struct Reference {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub enum OffsetValue {
     Immediate(Felt252),
     Value(i32),
@@ -290,7 +371,7 @@ impl fmt::Display for OffsetValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-
+#[cfg_attr(feature = "scale-codec", derive(Decode, Encode))]
 pub struct ValueAddress {
     pub offset1: OffsetValue,
     pub offset2: OffsetValue,
@@ -400,7 +481,7 @@ impl<'de> de::Visitor<'de> for MaybeRelocatableVisitor {
 struct ReferenceIdsVisitor;
 
 impl<'de> de::Visitor<'de> for ReferenceIdsVisitor {
-    type Value = HashMap<String, usize>;
+    type Value = ReferenceIds;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str("a map with string keys and integer values")
@@ -410,13 +491,13 @@ impl<'de> de::Visitor<'de> for ReferenceIdsVisitor {
     where
         A: MapAccess<'de>,
     {
-        let mut data: HashMap<String, usize> = HashMap::new();
+        let mut data: HashMap<String, u64> = HashMap::new();
 
-        while let Some((key, value)) = map.next_entry::<String, usize>()? {
+        while let Some((key, value)) = map.next_entry::<String, u64>()? {
             data.insert(key, value);
         }
 
-        Ok(data)
+        Ok(ReferenceIds(data))
     }
 }
 
@@ -455,7 +536,7 @@ pub fn deserialize_array_of_bigint_hex<'de, D: Deserializer<'de>>(
 
 pub fn deserialize_map_to_string_and_usize_hashmap<'de, D: Deserializer<'de>>(
     d: D,
-) -> Result<HashMap<String, usize>, D::Error> {
+) -> Result<ReferenceIds, D::Error> {
     d.deserialize_map(ReferenceIdsVisitor)
 }
 
@@ -534,7 +615,7 @@ pub fn parse_program_json(
 
     let shared_program_data = SharedProgramData {
         data: program_json.data,
-        hints: program_json.hints,
+        hints: Hints::from(program_json.hints),
         main: entrypoint_pc,
         start,
         end,
@@ -545,13 +626,13 @@ pub fn parse_program_json(
             .collect(),
         instruction_locations: program_json
             .debug_info
-            .map(|debug_info| debug_info.instruction_locations),
-        identifiers: program_json.identifiers,
+            .map(|debug_info| InstructionLocations::from(debug_info.instruction_locations)),
+        identifiers: Identifiers::from(program_json.identifiers),
         reference_manager: Program::get_reference_list(&program_json.reference_manager),
     };
     Ok(Program {
         shared_program_data: Arc::new(shared_program_data),
-        constants,
+        constants: Constants::from(constants),
         builtins: program_json.builtins,
     })
 }
@@ -561,15 +642,15 @@ pub fn parse_program(program: Program) -> ProgramJson {
         prime: program.prime().to_owned(),
         builtins: program.builtins().to_vec(),
         data: program.data().to_vec(),
-        identifiers: program.identifiers().to_owned(),
-        hints: program.hints().to_owned(),
+        identifiers: program.identifiers().inner(),
+        hints: program.hints().inner(),
         reference_manager: program.reference_manager(),
         attributes: program.error_message_attributes().to_owned(),
         debug_info: program
             .instruction_locations()
             .clone()
             .map(|instruction_locations| DebugInfo {
-                instruction_locations,
+                instruction_locations: instruction_locations.inner(),
             }),
         main_scope: String::default(),
         compiler_version: String::default(),
@@ -826,7 +907,7 @@ mod tests {
             MaybeRelocatable::Int(Felt252::new(2345108766317314046_i64)),
         ];
 
-        let mut hints: HashMap<usize, Vec<HintParams>> = HashMap::new();
+        let mut hints: HashMap<u64, Vec<HintParams>> = HashMap::new();
         hints.insert(
             0,
             vec![HintParams {
@@ -840,7 +921,7 @@ mod tests {
                         group: 0,
                         offset: 0,
                     },
-                    reference_ids: HashMap::from([
+                    reference_ids: ReferenceIds(HashMap::from([
                         (
                             String::from("starkware.cairo.common.math.split_felt.high"),
                             0,
@@ -857,7 +938,7 @@ mod tests {
                             String::from("starkware.cairo.common.math.split_felt.value"),
                             12,
                         ),
-                    ]),
+                    ])),
                 },
             }],
         );
@@ -1022,7 +1103,7 @@ mod tests {
             MaybeRelocatable::Int(Felt252::new(2345108766317314046_i64)),
         ];
 
-        let mut hints: HashMap<usize, Vec<HintParams>> = HashMap::new();
+        let mut hints: HashMap<u64, Vec<HintParams>> = HashMap::new();
         hints.insert(
             0,
             vec![HintParams {
@@ -1036,7 +1117,7 @@ mod tests {
                         group: 0,
                         offset: 0,
                     },
-                    reference_ids: HashMap::new(),
+                    reference_ids: ReferenceIds::new(),
                 },
             }],
         );
@@ -1050,7 +1131,7 @@ mod tests {
                         group: 5,
                         offset: 0,
                     },
-                    reference_ids: HashMap::new(),
+                    reference_ids: ReferenceIds::new(),
                 },
             }],
         );
@@ -1058,7 +1139,7 @@ mod tests {
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, Some(0));
-        assert_eq!(program.shared_program_data.hints, hints);
+        assert_eq!(program.shared_program_data.hints, Hints::from(hints));
     }
 
     /// Deserialize a program without an entrypoint.
@@ -1081,7 +1162,7 @@ mod tests {
             MaybeRelocatable::Int(Felt252::new(2345108766317314046_i64)),
         ];
 
-        let mut hints: HashMap<usize, Vec<HintParams>> = HashMap::new();
+        let mut hints: HashMap<u64, Vec<HintParams>> = HashMap::new();
         hints.insert(
             0,
             vec![HintParams {
@@ -1095,7 +1176,7 @@ mod tests {
                         group: 0,
                         offset: 0,
                     },
-                    reference_ids: HashMap::new(),
+                    reference_ids: ReferenceIds::new(),
                 },
             }],
         );
@@ -1109,7 +1190,7 @@ mod tests {
                         group: 5,
                         offset: 0,
                     },
-                    reference_ids: HashMap::new(),
+                    reference_ids: ReferenceIds::new(),
                 },
             }],
         );
@@ -1117,7 +1198,7 @@ mod tests {
         assert_eq!(program.builtins, builtins);
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
-        assert_eq!(program.shared_program_data.hints, hints);
+        assert_eq!(program.shared_program_data.hints, Hints::from(hints));
     }
 
     #[test]
@@ -1367,7 +1448,7 @@ mod tests {
                         group: 14,
                         offset: 35,
                     },
-                    reference_ids: HashMap::new(),
+                    reference_ids: ReferenceIds::new(),
                 }),
                 accessible_scopes: vec![
                     "openzeppelin.security.safemath.library".to_string(),
@@ -1385,7 +1466,7 @@ mod tests {
                         group: 15,
                         offset: 60,
                     },
-                    reference_ids: HashMap::new(),
+                    reference_ids: ReferenceIds::new(),
                 }),
                 accessible_scopes: vec![
                     "openzeppelin.security.safemath.library".to_string(),

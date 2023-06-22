@@ -120,14 +120,15 @@ impl EcOpBuiltinRunner {
         let beta_high: Felt252 = Felt252::new(0x6f21413efbe40de150e596d72f7a8c5_u128);
         let beta: Felt252 = (beta_high << 128_usize) + beta_low;
 
-        let index = address
-            .offset
-            .mod_floor(&(self.cells_per_instance as usize));
+        let index = address.offset.mod_floor(&(self.cells_per_instance as u64));
         //Index should be an output cell
-        if index != OUTPUT_INDICES.0 && index != OUTPUT_INDICES.1 {
+        if index != OUTPUT_INDICES.0 as u64 && index != OUTPUT_INDICES.1 as u64 {
             return Ok(None);
         }
-        let instance = Relocatable::from((address.segment_index, address.offset - index));
+        let instance = Relocatable::from((
+            address.segment_index as isize,
+            (address.offset - index) as usize,
+        ));
         let x_addr = (instance + (&Felt252::new(INPUT_CELLS_PER_EC_OP)))
             .map_err(|_| RunnerError::Memory(MemoryError::ExpectedInteger(Box::new(instance))))?;
 
@@ -194,7 +195,7 @@ impl EcOpBuiltinRunner {
                 .map_err(|_| RunnerError::Memory(MemoryError::ExpectedInteger(Box::new(x_addr))))?,
             result.1.clone().into(),
         );
-        match index - self.n_input_cells as usize {
+        match index - self.n_input_cells as u64 {
             0 => Ok(Some(MaybeRelocatable::Int(Felt252::new(result.0)))),
             _ => Ok(Some(MaybeRelocatable::Int(Felt252::new(result.1)))),
             //Default case corresponds to 1, as there are no other possible cases
@@ -231,7 +232,7 @@ impl EcOpBuiltinRunner {
                 .memory
                 .get_relocatable(stop_pointer_addr)
                 .map_err(|_| RunnerError::NoStopPointer(Box::new(EC_OP_BUILTIN_NAME)))?;
-            if self.base as isize != stop_pointer.segment_index {
+            if self.base as isize != stop_pointer.segment_index as isize {
                 return Err(RunnerError::InvalidStopPointerIndex(Box::new((
                     EC_OP_BUILTIN_NAME,
                     stop_pointer,
@@ -241,14 +242,14 @@ impl EcOpBuiltinRunner {
             let stop_ptr = stop_pointer.offset;
             let num_instances = self.get_used_instances(segments)?;
             let used = num_instances * self.cells_per_instance as usize;
-            if stop_ptr != used {
+            if stop_ptr != used as u64 {
                 return Err(RunnerError::InvalidStopPointer(Box::new((
                     EC_OP_BUILTIN_NAME,
                     Relocatable::from((self.base as isize, used)),
-                    Relocatable::from((self.base as isize, stop_ptr)),
+                    Relocatable::from((self.base as isize, stop_ptr as usize)),
                 ))));
             }
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(stop_ptr as usize);
             Ok(stop_pointer_addr)
         } else {
             let stop_ptr = self.base;

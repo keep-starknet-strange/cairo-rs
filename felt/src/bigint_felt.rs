@@ -20,8 +20,9 @@ use lazy_static::lazy_static;
 use num_bigint::{BigInt, BigUint, ToBigInt, U64Digits};
 use num_integer::Integer;
 use num_traits::{Bounded, FromPrimitive, Num, One, Pow, Signed, ToPrimitive, Zero};
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode, Output};
 use serde::{Deserialize, Serialize};
-
 lazy_static! {
     static ref CAIRO_PRIME_BIGUINT: BigUint =
         (Into::<BigUint>::into(FIELD_HIGH) << 128) + Into::<BigUint>::into(FIELD_LOW);
@@ -34,6 +35,83 @@ lazy_static! {
 #[derive(Eq, Hash, PartialEq, PartialOrd, Ord, Clone, Deserialize, Default, Serialize)]
 pub(crate) struct FeltBigInt<const PH: u128, const PL: u128> {
     val: BigUint,
+}
+
+#[cfg(feature = "scale-codec")]
+impl<const PH: u128, const PL: u128> Encode for FeltBigInt<PH, PL> {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Scale codec has its own way of representing data. The first 2 bits of the first
+        // byte determines the type of data it is.
+        // NOTE: The compact byte (first byte) is encoded in LE.
+        // This implementation is highly ispired from this: https://github.com/polkascan/py-scale-codec
+        if self <= &Self::from_u16(0b00111111).unwrap() {
+            // 0b00: single-byte mode; upper six bits are the LE encoding of the value (valid only for values of 0-63).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to append the 0b00 prefix to the number in little endian.
+            let encoded = self.val.to_u8().unwrap() << 2;
+            dest.write(&[encoded]);
+        } else if self <= &Self::from_u16(0b0011111111111111).unwrap() {
+            // 0b01: two-byte mode: upper six bits and the following byte is the LE encoding of the value (valid only for values 64-(2**14-1)).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to have 0b00 at the end of the number then we apply | 0b01 to append the 0b01 prefix to the number in little endian.
+            let encoded = self.val.to_u16().unwrap() << 2 | 0b01;
+            dest.write(&encoded.to_le_bytes());
+        } else if self <= &Self::from_u32(0b00111111111111111111111111111111).unwrap() {
+            // 0b10: four-byte mode: upper six bits and the following three bytes are the LE encoding of the value (valid only for values (2**14)-(2**30-1)).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to have 0b00 at the end of the number then we apply | 0b10 to append the 0b10 prefix to the number in little endian.
+            let encoded = self.val.to_u32().unwrap() << 2 | 0b10;
+            dest.write(&encoded.to_le_bytes());
+        } else {
+            // 0b11: Big-integer mode: The upper six bits are the number of bytes following, plus four.
+            // The value is contained, LE encoded, in the bytes following.
+            // The final (most significant) byte must be non-zero. Valid only for values (2**30)-(2**536-1).
+            let bytes = self.val.to_bytes_le();
+            let mut encoded_value = vec![((bytes.len() - 4) << 2 | 0b11).to_le_bytes()[0]];
+            // For example for val = 100000000000000 we would have:
+            // first byte : 0b11011000 == 11_u8
+            // All the bytes [11, 0, 64, 122, 16, 243, 90]
+            // Hex: 0x0b00407a10f35a
+            // see this example: https://docs.substrate.io/reference/scale-codec/
+            // To verify the result you can run this python snippet:
+            // hex(int.from_bytes(bytes([11, 0, 64, 122, 16, 243, 90]), 'big'))
+            encoded_value.extend(bytes.iter());
+            dest.write(&encoded_value)
+        }
+    }
+}
+
+#[cfg(feature = "scale-codec")]
+impl<const PH: u128, const PL: u128> Decode for FeltBigInt<PH, PL> {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let compact_byte = input.read_byte()?;
+        let compact_length = match compact_byte % 4 {
+            0 => 1,
+            1 => 2,
+            2 => 4,
+            _ => 5 + (compact_byte - 3) / 4,
+        };
+        Ok(if compact_length == 1 {
+            Self {
+                val: BigUint::from_bytes_le(&[compact_byte]) / BigUint::from_u8(4).unwrap(),
+            }
+        } else if [2, 4].contains(&compact_length) {
+            let mut buffer = vec![0; compact_length as usize - 1];
+            input.read(&mut buffer)?;
+            Self {
+                val: BigUint::from_bytes_le(&[vec![compact_byte], buffer].concat())
+                    / BigUint::from_u8(4).unwrap(),
+            }
+        } else {
+            let mut buffer = vec![0; compact_length as usize - 1];
+            input.read(&mut buffer)?;
+            Self {
+                val: BigUint::from_bytes_le(&buffer),
+            }
+        })
+    }
 }
 
 macro_rules! from_integer {
@@ -854,6 +932,9 @@ mod tests {
     #[cfg(all(not(feature = "std"), feature = "alloc"))]
     use alloc::string::ToString;
 
+    #[cfg(feature = "scale-codec")]
+    use hex::FromHex;
+
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
 
@@ -1048,6 +1129,127 @@ mod tests {
         assert_eq!(a.clone() % b, d);
         assert_eq!(a % c, d)
     }
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_0() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(0).unwrap();
+        let expected_result = <[u8; 1]>::from_hex("00").unwrap();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_1() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(1).unwrap();
+        let expected_result = <[u8; 1]>::from_hex("04").unwrap();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_42() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(42).unwrap();
+        let expected_result = <[u8; 1]>::from_hex("a8").unwrap();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_69() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(69).unwrap();
+        let expected_result = <[u8; 2]>::from_hex("1501").unwrap();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_65535() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u16(65535).unwrap();
+        let expected_result = <[u8; 4]>::from_hex("feff0300").unwrap();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_100000000000000() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_i64(100000000000000).unwrap();
+        let expected_result = <[u8; 7]>::from_hex("0b00407a10f35a").unwrap();
+        assert_eq!(val.encode(), expected_result)
+    }
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_0() {
+        let val = <[u8; 1]>::from_hex("00").unwrap();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(0).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_1() {
+        let val = <[u8; 1]>::from_hex("04").unwrap();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(1).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_42() {
+        let val = <[u8; 1]>::from_hex("a8").unwrap();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(42).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_69() {
+        let val = <[u8; 2]>::from_hex("1501").unwrap();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(69).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_65535() {
+        let val = <[u8; 4]>::from_hex("feff0300").unwrap();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> =
+            FeltBigInt::from_u16(65535).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    // Tests that scale decode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_100000000000000() {
+        let val = <[u8; 7]>::from_hex("0b00407a10f35a").unwrap();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> =
+            FeltBigInt::from_i64(100000000000000).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
 
     proptest! {
         #[test]
@@ -1217,6 +1419,15 @@ mod tests {
             let result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = v.into_iter().sum();
             let as_uint = result.to_biguint();
             prop_assert!(as_uint < p, "{}", as_uint);
+        }
+
+        #[test]
+        #[cfg(feature = "scale-codec")]
+        // Property-based test that ensures, encoding/decoding values don't modify the original value.
+         fn encode_decode_felt(ref x in "([1-9][0-9]*)", ) {
+            let x = FeltBigInt::<FIELD_HIGH, FIELD_LOW>::parse_bytes(x.as_bytes(), 10).unwrap();
+            let encoded_decoded =  FeltBigInt::<FIELD_HIGH, FIELD_LOW>::decode(&mut &x.encode()[..]).unwrap();
+            prop_assert!(x == encoded_decoded);
         }
     }
 }

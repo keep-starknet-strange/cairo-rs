@@ -115,7 +115,7 @@ pub fn dict_read(
     let dict_manager_ref = exec_scopes.get_dict_manager()?;
     let mut dict = dict_manager_ref.borrow_mut();
     let tracker = dict.get_tracker_mut(dict_ptr)?;
-    tracker.current_ptr.offset += DICT_ACCESS_SIZE;
+    tracker.current_ptr.offset += DICT_ACCESS_SIZE as u64;
     let value = tracker.get_value(&key)?;
     insert_value_from_var_name("value", value.clone(), vm, ids_data, ap_tracking)
 }
@@ -143,7 +143,7 @@ pub fn dict_write(
     //dict_ptr.prev_value will be equal to dict_ptr + 1
     let dict_ptr_prev_value = (dict_ptr + 1_i32)?;
     //Tracker set to track next dictionary entry
-    tracker.current_ptr.offset += DICT_ACCESS_SIZE;
+    tracker.current_ptr.offset += DICT_ACCESS_SIZE as u64;
     //Get previous value
     let prev_value = tracker.get_value(&key)?.clone();
     //Insert new value into tracker
@@ -191,7 +191,7 @@ pub fn dict_update(
     }
     //Update Value
     tracker.insert_value(&key, &new_value);
-    tracker.current_ptr.offset += DICT_ACCESS_SIZE;
+    tracker.current_ptr.offset += DICT_ACCESS_SIZE as u64;
     Ok(())
 }
 
