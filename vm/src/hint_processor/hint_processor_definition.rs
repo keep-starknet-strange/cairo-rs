@@ -13,6 +13,8 @@ use crate::vm::vm_core::VirtualMachine;
 
 use super::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
 use felt::Felt252;
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 
 pub trait HintProcessor {
     //Executes the hint which's data is provided by a dynamic structure previously created by compile_hint
@@ -84,6 +86,47 @@ pub struct HintReference {
     pub dereference: bool,
     pub ap_tracking_data: Option<ApTracking>,
     pub cairo_type: Option<String>,
+}
+
+#[cfg(feature = "scale-codec")]
+impl Encode for HintReference {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        (
+            val.offset1,
+            val.offset2,
+            val.pc.map(|v| v as u64),
+            val.dereference,
+            val.ap_tracking_data,
+            val.cairo_type,
+        )
+            .encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for HintReference {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            OffsetValue,
+            OffsetValue,
+            Option<u64>,
+            bool,
+            Option<ApTracking>,
+            Option<String>,
+        )>::decode(input)
+        .unwrap();
+
+        Ok(HintReference {
+            offset1: res.0,
+            offset2: res.1,
+            pc: res.2.map(|v| v as usize),
+            dereference: res.3,
+            ap_tracking_data: res.4,
+            cairo_type: res.5,
+        })
+    }
 }
 
 impl HintReference {

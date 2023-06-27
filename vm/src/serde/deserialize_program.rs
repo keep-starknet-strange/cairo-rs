@@ -1,5 +1,6 @@
 use crate::stdlib::{collections::HashMap, fmt, prelude::*, sync::Arc};
 
+use super::serialize_program::serialize_value_address;
 use crate::vm::runners::builtin_runner::SEGMENT_ARENA_BUILTIN_NAME;
 use crate::{
     serde::{deserialize_utils, serialize_program::number_from_felt},
@@ -18,14 +19,15 @@ use crate::{
 use felt::{Felt252, PRIME_STR};
 use num_traits::float::FloatCore;
 use num_traits::{Num, Pow, Zero};
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 use serde::{de, de::MapAccess, de::SeqAccess, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
-
-use super::serialize_program::serialize_value_address;
 
 // This enum is used to deserialize program builtins into &str and catch non-valid names
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone, Eq, Hash)]
 #[allow(non_camel_case_types)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub enum BuiltinName {
     output,
     range_check,
@@ -73,6 +75,7 @@ pub struct ProgramJson {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct HintParams {
     pub code: String,
     pub accessible_scopes: Vec<String>,
@@ -85,11 +88,61 @@ pub struct FlowTrackingData {
     #[serde(deserialize_with = "deserialize_map_to_string_and_usize_hashmap")]
     pub reference_ids: HashMap<String, usize>,
 }
+#[cfg(feature = "scale-codec")]
+impl Encode for FlowTrackingData {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        let reference_ids = val
+            .reference_ids
+            .into_iter()
+            .collect::<Vec<(String, usize)>>();
+        let reference_ids: Vec<(String, [u8; core::mem::size_of::<usize>()])> =
+            unsafe { core::mem::transmute(reference_ids) };
+
+        (val.ap_tracking, reference_ids).encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for FlowTrackingData {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            ApTracking,
+            Vec<(String, [u8; core::mem::size_of::<usize>()])>,
+        )>::decode(input)
+        .unwrap();
+        let reference_ids: Vec<(String, usize)> = unsafe { core::mem::transmute(res.1) };
+        Ok(FlowTrackingData {
+            ap_tracking: res.0,
+            reference_ids: <HashMap<String, usize>>::from_iter(reference_ids.into_iter()),
+        })
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ApTracking {
     pub group: usize,
     pub offset: usize,
+}
+
+#[cfg(feature = "scale-codec")]
+impl Encode for ApTracking {
+    fn encode(&self) -> Vec<u8> {
+        (self.group as u64, self.offset as u64).encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for ApTracking {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(u64, u64)>::decode(input).unwrap();
+        Ok(ApTracking {
+            group: res.0 as usize,
+            offset: res.1 as usize,
+        })
+    }
 }
 
 impl ApTracking {
@@ -139,10 +192,85 @@ pub struct Identifier {
     pub references: Option<Vec<Reference>>,
 }
 
+#[cfg(feature = "scale-codec")]
+impl Encode for Identifier {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        let members: Option<Vec<(String, Member)>> = val.members.map(|m| m.into_iter().collect());
+        (
+            val.pc.map(|v| v as u64),
+            val.type_,
+            val.value,
+            val.full_name,
+            members,
+            val.cairo_type,
+            val.decorators,
+            val.size,
+            val.destination,
+            val.references,
+        )
+            .encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for Identifier {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            Option<u64>,
+            Option<String>,
+            Option<Felt252>,
+            Option<String>,
+            Option<Vec<(String, Member)>>,
+            Option<String>,
+            Option<Vec<String>>,
+            Option<u64>,
+            Option<String>,
+            Option<Vec<Reference>>,
+        )>::decode(input)
+        .unwrap();
+        Ok(Identifier {
+            pc: res.0.map(|v| v as usize),
+            type_: res.1,
+            value: res.2,
+            full_name: res.3,
+            members: res
+                .4
+                .map(|v| <HashMap<String, Member>>::from_iter(v.into_iter())),
+            cairo_type: res.5,
+            decorators: res.6,
+            size: res.7,
+            destination: res.8,
+            references: res.9,
+        })
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Member {
     pub cairo_type: String,
     pub offset: usize,
+}
+
+#[cfg(feature = "scale-codec")]
+impl Encode for Member {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        (val.cairo_type, val.offset as u64).encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for Member {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(String, u64)>::decode(input).unwrap();
+        Ok(Member {
+            cairo_type: res.0,
+            offset: res.1 as usize,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -155,7 +283,48 @@ pub struct Attribute {
     pub accessible_scopes: Vec<String>,
 }
 
+#[cfg(feature = "scale-codec")]
+impl Encode for Attribute {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        (
+            val.name,
+            val.start_pc as u64,
+            val.end_pc as u64,
+            val.value,
+            val.flow_tracking_data,
+            val.accessible_scopes,
+        )
+            .encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for Attribute {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            String,
+            u64,
+            u64,
+            String,
+            Option<FlowTrackingData>,
+            Vec<String>,
+        )>::decode(input)
+        .unwrap();
+        Ok(Attribute {
+            name: res.0,
+            start_pc: res.1 as usize,
+            end_pc: res.2 as usize,
+            value: res.3,
+            flow_tracking_data: res.4,
+            accessible_scopes: res.5,
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct Location {
     pub end_line: u32,
     pub end_col: u32,
@@ -171,17 +340,20 @@ pub struct DebugInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct InstructionLocation {
     pub inst: Location,
     pub hints: Vec<HintLocation>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct InputFile {
     pub filename: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct HintLocation {
     pub location: Location,
     pub n_prefix_newlines: u32,
@@ -240,7 +412,34 @@ pub struct Reference {
     pub value_address: ValueAddress,
 }
 
+#[cfg(feature = "scale-codec")]
+impl Encode for Reference {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        (
+            val.ap_tracking_data,
+            val.pc.map(|v| v as u64),
+            val.value_address,
+        )
+            .encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for Reference {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(ApTracking, Option<u64>, ValueAddress)>::decode(input).unwrap();
+        Ok(Reference {
+            ap_tracking_data: res.0,
+            pc: res.1.map(|v| v as usize),
+            value_address: res.2,
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub enum OffsetValue {
     Immediate(Felt252),
     Value(i32),
@@ -290,7 +489,7 @@ impl fmt::Display for OffsetValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-
+#[cfg_attr(feature = "scale-codec", derive(Encode, Decode))]
 pub struct ValueAddress {
     pub offset1: OffsetValue,
     pub offset2: OffsetValue,
@@ -585,6 +784,88 @@ mod tests {
 
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    fn test_encode_decode_attribute() {
+        let attributes: Vec<Attribute> = vec![
+            Attribute {
+                name: String::from("error_message"),
+                start_pc: 379,
+                end_pc: 381,
+                value: String::from("SafeUint256: addition overflow"),
+                flow_tracking_data: Some(FlowTrackingData {
+                    ap_tracking: ApTracking {
+                        group: 14,
+                        offset: 35,
+                    },
+                    reference_ids: HashMap::new(),
+                }),
+                accessible_scopes: vec![
+                    "openzeppelin.security.safemath.library".to_string(),
+                    "openzeppelin.security.safemath.library.SafeUint256".to_string(),
+                    "openzeppelin.security.safemath.library.SafeUint256.add".to_string(),
+                ],
+            },
+            Attribute {
+                name: String::from("error_message"),
+                start_pc: 402,
+                end_pc: 404,
+                value: String::from("SafeUint256: subtraction overflow"),
+                flow_tracking_data: Some(FlowTrackingData {
+                    ap_tracking: ApTracking {
+                        group: 15,
+                        offset: 60,
+                    },
+                    reference_ids: HashMap::new(),
+                }),
+                accessible_scopes: vec![
+                    "openzeppelin.security.safemath.library".to_string(),
+                    "openzeppelin.security.safemath.library.SafeUint256".to_string(),
+                    "openzeppelin.security.safemath.library.SafeUint256.sub_le".to_string(),
+                ],
+            },
+        ];
+        for attribute in attributes.iter() {
+            assert_eq!(
+                *attribute,
+                Attribute::decode(&mut &attribute.encode()[..]).unwrap()
+            )
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    fn test_encode_decode_flow_tracking_data() {
+        let flow_tracking_data = FlowTrackingData {
+            ap_tracking: ApTracking {
+                group: 0,
+                offset: 0,
+            },
+            reference_ids: HashMap::from([
+                (
+                    String::from("starkware.cairo.common.math.split_felt.high"),
+                    0,
+                ),
+                (
+                    String::from("starkware.cairo.common.math.split_felt.low"),
+                    14,
+                ),
+                (
+                    String::from("starkware.cairo.common.math.split_felt.range_check_ptr"),
+                    16,
+                ),
+                (
+                    String::from("starkware.cairo.common.math.split_felt.value"),
+                    12,
+                ),
+            ]),
+        };
+        assert_eq!(
+            flow_tracking_data,
+            FlowTrackingData::decode(&mut &flow_tracking_data.encode()[..]).unwrap()
+        )
+    }
 
     #[test]
     fn test_offset_value_display() {

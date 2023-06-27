@@ -14,7 +14,8 @@ use crate::{
 #[cfg(feature = "cairo-1-hints")]
 use cairo_lang_casm_contract_class::CasmContractClass;
 use felt::{Felt252, PRIME_STR};
-
+#[cfg(feature = "scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 #[cfg(feature = "std")]
 use std::path::Path;
 
@@ -53,11 +54,130 @@ pub struct SharedProgramData {
     pub(crate) reference_manager: Vec<HintReference>,
 }
 
+#[cfg(feature = "scale-codec")]
+impl Encode for SharedProgramData {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        // Convert the hashmap to a vec because it's encodable.
+        let hints = val
+            .hints
+            .into_iter()
+            .collect::<Vec<(usize, Vec<HintParams>)>>();
+        // Transmute to bytes slice because usize is not encodable.
+        let hints: Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)> =
+            unsafe { core::mem::transmute(hints) };
+
+        // Convert the hashmap to a vec because it's encodable.
+        let instruction_locations = val
+            .instruction_locations
+            .map(|i| i.into_iter().collect::<Vec<(usize, InstructionLocation)>>());
+        // Transmute to bytes slice because usize is not encodable.
+        let instruction_locations: Option<
+            Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>,
+        > = unsafe { core::mem::transmute(instruction_locations) };
+        let identifiers = val
+            .identifiers
+            .into_iter()
+            .collect::<Vec<(String, Identifier)>>();
+        (
+            val.data,
+            hints,
+            val.main.map(|v| v as u64),
+            val.start.map(|v| v as u64),
+            val.end.map(|v| v as u64),
+            val.error_message_attributes,
+            instruction_locations,
+            identifiers,
+            val.reference_manager,
+        )
+            .encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for SharedProgramData {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            Vec<MaybeRelocatable>,
+            Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
+            Option<u64>,
+            Option<u64>,
+            Option<u64>,
+            Vec<Attribute>,
+            Option<Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>>,
+            Vec<(String, Identifier)>,
+            Vec<HintReference>,
+        )>::decode(input)
+        .unwrap();
+        let hints: Vec<(usize, Vec<HintParams>)> = unsafe {
+            core::mem::transmute(
+                res.1
+                    .into_iter()
+                    .collect::<Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>>(),
+            )
+        };
+        let hints = <HashMap<usize, Vec<HintParams>>>::from_iter(hints.into_iter());
+
+        let instruction_locations: Option<Vec<(usize, InstructionLocation)>> =
+            unsafe { core::mem::transmute(res.6) };
+
+        let instruction_locations: Option<HashMap<usize, InstructionLocation>> =
+            instruction_locations
+                .map(|i| <HashMap<usize, InstructionLocation>>::from_iter(i.into_iter()));
+
+        let identifiers = <HashMap<String, Identifier>>::from_iter(res.7.into_iter());
+
+        Ok(SharedProgramData {
+            data: res.0,
+            hints,
+            main: res.2.map(|v| v as usize),
+            start: res.3.map(|v| v as usize),
+            end: res.4.map(|v| v as usize),
+            error_message_attributes: res.5,
+            instruction_locations,
+            identifiers,
+            reference_manager: res.8,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Program {
     pub shared_program_data: Arc<SharedProgramData>,
     pub constants: HashMap<String, Felt252>,
     pub builtins: Vec<BuiltinName>,
+}
+
+#[cfg(feature = "scale-codec")]
+impl Encode for Program {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        let constants = val
+            .constants
+            .into_iter()
+            .collect::<Vec<(String, Felt252)>>();
+        (val.shared_program_data, constants, val.builtins).encode()
+    }
+}
+#[cfg(feature = "scale-codec")]
+impl Decode for Program {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            Arc<SharedProgramData>,
+            Vec<(String, Felt252)>,
+            Vec<BuiltinName>,
+        )>::decode(input)
+        .unwrap();
+        let constants = <HashMap<String, Felt252>>::from_iter(res.1.into_iter());
+        Ok(Program {
+            shared_program_data: res.0,
+            constants,
+            builtins: res.2,
+        })
+    }
 }
 
 impl Program {
@@ -284,6 +404,21 @@ mod tests {
 
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
+
+    #[test]
+    #[cfg(feature = "scale-codec")]
+    fn test_encode_decode_program() {
+        let program = Program::from_bytes(
+            include_bytes!("../../../cairo_programs/manually_compiled/valid_program_a.json"),
+            Some("main"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            program,
+            Program::decode(&mut &program.encode()[..]).unwrap()
+        )
+    }
 
     #[test]
     fn test_serialize_program() {
