@@ -21,6 +21,7 @@ std = [
     "thiserror-no-std/std",
 ]
 
+
 lambdaworks-felt = ["felt/lambdaworks-felt"]
 cairo-1-hints = [
     "dep:cairo-lang-casm-contract-class",
@@ -28,7 +29,6 @@ cairo-1-hints = [
     "dep:ark-ff",
     "dep:ark-std",
 ]
-
 
 # Note that these features are not retro-compatible with the cairo Python VM.
 test_utils = [
@@ -63,7 +63,14 @@ thiserror-no-std = { workspace = true }
 
 # only for std
 num-prime = { version = "0.4.3", features = ["big-int"], optional = true }
-felt = { workspace = true }
+
+# This crate has only one function `take_until_unbalanced` that is
+# very useful for our parsing purposes:
+# https://stackoverflow.com/questions/70630556/parse-allowing-nested-parentheses-in-nom
+# There is a proposal for extending nom::delimited to use this function:
+# https://github.com/Geal/nom/issues/1253
+parse-hyperlinks = { workspace = true }
+felt = { workspace = true, features = ["parity-scale-codec"] }
 bitvec = { workspace = true }
 
 # Dependencies for cairo-1-hints feature
@@ -74,8 +81,13 @@ cairo-lang-casm-contract-class = { workspace = true, optional = true }
 ark-ff = { workspace = true, optional = true }
 ark-std = { workspace = true, optional = true }
 
+parity-scale-codec = { workspace = true, optional = true, features = [
+    "derive",
+] }
+
 [dev-dependencies]
 assert_matches = "1.5.0"
+pretty_assertions = { workspace = true }
 rstest = { version = "0.17.0", default-features = false }
 num-prime = { version = "0.4.3", features = ["big-int"] }
 
