@@ -1,11 +1,6 @@
 use crate::ParseFeltError;
 
 use crate::bigint_felt::{FeltBigInt, FIELD_HIGH, FIELD_LOW};
-use num_bigint::{BigInt, BigUint, U64Digits};
-use num_integer::Integer;
-use num_traits::{Bounded, FromPrimitive, Num, One, Pow, Signed, ToPrimitive, Zero};
-use serde::{Deserialize, Serialize};
-
 use core::{
     convert::Into,
     fmt,
@@ -15,6 +10,12 @@ use core::{
         Sub, SubAssign,
     },
 };
+use num_bigint::{BigInt, BigUint, U64Digits};
+use num_integer::Integer;
+use num_traits::{Bounded, FromPrimitive, Num, One, Pow, Signed, ToPrimitive, Zero};
+#[cfg(feature = "parity-scale-codec")]
+use parity_scale_codec::{Decode, Encode};
+use serde::{Deserialize, Serialize};
 
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::{string::String, vec::Vec};
@@ -71,6 +72,7 @@ macro_rules! felt_str {
 
 #[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary))]
 #[derive(Eq, Hash, PartialEq, PartialOrd, Ord, Clone, Deserialize, Default, Serialize)]
+#[cfg_attr(feature = "parity-scale-codec", derive(Encode, Decode))]
 pub struct Felt252 {
     pub(crate) value: FeltBigInt<FIELD_HIGH, FIELD_LOW>,
 }
@@ -1715,5 +1717,125 @@ mod test {
         let bytes = [0; 32];
         let got = Felt252::from_bytes_ne(&bytes);
         assert_eq!(got, expected);
+    }
+
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_0() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(0).unwrap();
+        let expected_result = [0];
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_1() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(1).unwrap();
+        let expected_result = [4];
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_42() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(42).unwrap();
+        let expected_result = [0xa8];
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_69() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(69).unwrap();
+        let expected_result = 0x1501u16.to_be_bytes();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_65535() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u16(65535).unwrap();
+        let expected_result = 0xfeff0300u32.to_be_bytes();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_100000000000000() {
+        let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_i64(100000000000000).unwrap();
+        let expected_result = 0x0b00407a10f35au64.to_be_bytes();
+        assert_eq!(val.encode(), expected_result)
+    }
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_0() {
+        let val = [0];
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(0).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_1() {
+        let val = [4];
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(1).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_42() {
+        let val = [0xa8];
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(42).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_69() {
+        let val = 0x1501u16.to_be_bytes();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_u8(69).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_65535() {
+        let val = 0xfeff0300u32.to_be_bytes();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> =
+            FeltBigInt::from_u16(65535).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale decode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_100000000000000() {
+        let val = 0x0b00407a10f35au64.to_be_bytes();
+        let expected_result: FeltBigInt<FIELD_HIGH, FIELD_LOW> =
+            FeltBigInt::from_i64(100000000000000).unwrap();
+        assert_eq!(FeltBigInt::decode(&mut &val[1..]).unwrap(), expected_result)
     }
 }

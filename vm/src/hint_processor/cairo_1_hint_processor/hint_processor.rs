@@ -24,6 +24,7 @@ use cairo_lang_casm::{
 };
 use core::any::Any;
 use core::ops::Shl;
+use num_traits::Zero;
 
 use core::ops::Shl;
 use num_bigint::BigUint;
@@ -124,17 +125,32 @@ impl Cairo1HintProcessor {
                 self.get_next_dict_key(vm, exec_scopes, next_key)
             }
             Hint::Core(CoreHintBase::Core(CoreHint::Uint256DivMod {
-                dividend0,
-                dividend1,
-                divisor0,
-                divisor1,
+                dividend_low,
+                dividend_high,
+                divisor_low,
+                divisor_high,
                 quotient0,
                 quotient1,
-                remainder0,
-                remainder1,
+                divisor0,
+                divisor1,
+                extra0,
+                extra1,
+                remainder_low,
+                remainder_high,
             })) => self.uint256_div_mod(
-                vm, dividend0, dividend1, divisor0, divisor1, quotient0, quotient1, remainder0,
-                remainder1,
+                vm,
+                dividend_low,
+                dividend_high,
+                divisor_low,
+                divisor_high,
+                quotient0,
+                quotient1,
+                divisor0,
+                divisor1,
+                extra0,
+                extra1,
+                remainder_low,
+                remainder_high,
             ),
             Hint::Core(CoreHintBase::Deprecated(DeprecatedHint::Felt252DictWrite {
                 dict_ptr,
@@ -389,14 +405,18 @@ impl Cairo1HintProcessor {
     fn uint256_div_mod(
         &self,
         vm: &mut VirtualMachine,
-        dividend0: &ResOperand,
-        dividend1: &ResOperand,
-        divisor0: &ResOperand,
-        divisor1: &ResOperand,
+        dividend_low: &ResOperand,
+        dividend_high: &ResOperand,
+        divisor_low: &ResOperand,
+        divisor_high: &ResOperand,
         quotient0: &CellRef,
         quotient1: &CellRef,
-        remainder0: &CellRef,
-        remainder1: &CellRef,
+        divisor0: &CellRef,
+        divisor1: &CellRef,
+        extra0: &CellRef,
+        extra1: &CellRef,
+        remainder_low: &CellRef,
+        remainder_high: &CellRef,
     ) -> Result<(), HintError> {
         let pow_2_128 = BigUint::from(u128::MAX) + 1u32;
         let dividend0 = get_val(vm, dividend0)?.to_biguint();
@@ -408,21 +428,12 @@ impl Cairo1HintProcessor {
         let (quotient, remainder) = dividend.div_rem(&divisor);
         let (limb1, limb0) = quotient.div_rem(&pow_2_128);
         vm.insert_value(
-            cell_ref_to_relocatable(quotient0, vm)?,
-            Felt252::from(limb0),
+            cell_ref_to_relocatable(remainder_low, vm)?,
+            Felt252::from(remainder.clone() % pow_2_128.clone()),
         )?;
         vm.insert_value(
-            cell_ref_to_relocatable(quotient1, vm)?,
-            Felt252::from(limb1),
-        )?;
-        let (limb1, limb0) = remainder.div_rem(&pow_2_128);
-        vm.insert_value(
-            cell_ref_to_relocatable(remainder0, vm)?,
-            Felt252::from(limb0),
-        )?;
-        vm.insert_value(
-            cell_ref_to_relocatable(remainder1, vm)?,
-            Felt252::from(limb1),
+            cell_ref_to_relocatable(remainder_high, vm)?,
+            Felt252::from(remainder / pow_2_128),
         )?;
 
         Ok(())

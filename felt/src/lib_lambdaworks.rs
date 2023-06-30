@@ -11,12 +11,15 @@ use lambdaworks_math::{
     field::{
         element::FieldElement, fields::fft_friendly::stark_252_prime_field::Stark252PrimeField,
     },
+    traits::ByteConversion,
     unsigned_integer::element::UnsignedInteger,
 };
 use lazy_static::lazy_static;
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
 use num_integer::Integer;
 use num_traits::{Bounded, FromPrimitive, Num, One, Pow, Signed, ToPrimitive, Zero};
+#[cfg(feature = "parity-scale-codec")]
+use parity_scale_codec::{Decode, Encode, Output};
 use serde::{Deserialize, Serialize};
 
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
@@ -59,6 +62,90 @@ macro_rules! felt_str {
 #[serde(into = "BigInt")]
 pub struct Felt252 {
     pub(crate) value: FieldElement<Stark252PrimeField>,
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl Encode for Felt252 {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Scale codec has its own way of representing data. The first 2 bits of the first
+        // byte determines the type of data it is.
+        // NOTE: The compact byte (first byte) is encoded in LE.
+        // This implementation is highly inspired from this: https://github.com/polkascan/py-scale-codec
+        if self <= &Self::from_u16(0b00111111).unwrap() {
+            // 0b00: single-byte mode; upper six bits are the LE encoding of the value (valid only for values of 0-63).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to append the 0b00 prefix to the number in little endian.
+            let encoded = self.to_u8().unwrap() << 2;
+            dest.write(&[encoded]);
+        } else if self <= &Self::from_u16(0b0011111111111111).unwrap() {
+            // 0b01: two-byte mode: upper six bits and the following byte is the LE encoding of the value (valid only for values 64-(2**14-1)).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to have 0b00 at the end of the number then we apply | 0b01 to append the 0b01 prefix to the number in little endian.
+            let encoded = self.to_u16().unwrap() << 2 | 0b01;
+            dest.write(&encoded.to_le_bytes());
+        } else if self <= &Self::from_u32(0b00111111111111111111111111111111).unwrap() {
+            // 0b10: four-byte mode: upper six bits and the following three bytes are the LE encoding of the value (valid only for values (2**14)-(2**30-1)).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to have 0b00 at the end of the number then we apply | 0b10 to append the 0b10 prefix to the number in little endian.
+            let encoded = self.to_u32().unwrap() << 2 | 0b10;
+            dest.write(&encoded.to_le_bytes());
+        } else {
+            // 0b11: Big-integer mode: The upper six bits are the number of bytes following, plus four.
+            // The value is contained, LE encoded, in the bytes following.
+            // The final (most significant) byte must be non-zero. Valid only for values (2**30)-(2**536-1).
+            let mut bytes = self
+                .to_le_bytes()
+                .into_iter()
+                .rev()
+                .skip_while(|&x| x == 0)
+                .collect::<Vec<u8>>();
+            bytes.reverse();
+            let mut encoded_value = vec![((bytes.len() - 4) << 2 | 0b11).to_le_bytes()[0]];
+            // For example for val = 100000000000000 we would have:
+            // first byte : 0b11011000 == 11_u8
+            // All the bytes [11, 0, 64, 122, 16, 243, 90]
+            // Hex: 0x0b00407a10f35a
+            // see this example: https://docs.substrate.io/reference/scale-codec/
+            // To verify the result you can run this python snippet:
+            // hex(int.from_bytes(bytes([11, 0, 64, 122, 16, 243, 90]), 'big'))
+            encoded_value.extend(bytes.iter());
+            dest.write(&encoded_value)
+        }
+    }
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl Decode for Felt252 {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let compact_byte = input.read_byte()?;
+        let compact_length = match compact_byte % 4 {
+            0 => 1,
+            1 => 2,
+            2 => 4,
+            _ => 5 + (compact_byte - 3) / 4,
+        };
+        Ok(if compact_length == 1 {
+            Self::from_u8(compact_byte.to_be()).unwrap() / Self::from_u8(4).unwrap()
+        } else if [2, 4].contains(&compact_length) {
+            let mut buffer = vec![0; compact_length as usize - 1];
+            input.read(&mut buffer)?;
+            let mut bytes = [0; 4];
+            bytes[0] = compact_byte;
+            bytes[1..compact_length as usize].copy_from_slice(&buffer);
+            Self::from_u32(u32::from_le_bytes(bytes) / 4).unwrap()
+        } else {
+            let mut buffer = vec![0; compact_length as usize - 1];
+            input.read(&mut buffer)?;
+            let mut bytes = [0u8; 32];
+            bytes[..compact_length as usize - 1].copy_from_slice(&buffer);
+            Self {
+                // It was encoded before it can be decoded.
+                value: FieldElement::<Stark252PrimeField>::from_bytes_le(&bytes).unwrap(),
+            }
+        })
+    }
 }
 
 // TODO: remove and change for transformation + compare
@@ -1000,7 +1087,9 @@ mod test {
     use num_integer::Integer;
     use rstest::rstest;
 
+    use num_integer::Integer;
     use proptest::prelude::*;
+    use rstest::rstest;
 
     proptest! {
         #[test]
@@ -1756,5 +1845,124 @@ mod test {
         let bytes = [0; 32];
         let got = Felt252::from_bytes_ne(&bytes);
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_0() {
+        let val = Felt252::from_u8(0).unwrap();
+        let expected_result = [0];
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_1() {
+        let val = Felt252::from_u8(1).unwrap();
+        let expected_result = [4];
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_42() {
+        let val = Felt252::from_u8(42).unwrap();
+        let expected_result = [0xa8];
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_69() {
+        let val = Felt252::from_u8(69).unwrap();
+        let expected_result = 0x1501u16.to_be_bytes();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_65535() {
+        let val = Felt252::from_u16(65535).unwrap();
+        let expected_result = 0xfeff0300u32.to_be_bytes();
+        assert_eq!(val.encode(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_encode_100000000000000() {
+        let val = Felt252::from_u64(100000000000000).unwrap();
+        let expected_result = 0x0b00407a10f35au64.to_be_bytes();
+        assert_eq!(val.encode(), expected_result[1..])
+    }
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_0() {
+        let val = [0];
+        let expected_result = Felt252::from_u8(0).unwrap();
+        assert_eq!(Felt252::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_1() {
+        let val = [4];
+        let expected_result = Felt252::from_u8(1).unwrap();
+        assert_eq!(Felt252::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_42() {
+        let val = [0xa8];
+        let expected_result = Felt252::from_u8(42).unwrap();
+        assert_eq!(Felt252::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_69() {
+        let val = 0x1501u16.to_be_bytes();
+        let expected_result = Felt252::from_u8(69).unwrap();
+        assert_eq!(Felt252::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale encode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_65535() {
+        let val = 0xfeff0300u32.to_be_bytes();
+        let expected_result = Felt252::from_u16(65535).unwrap();
+        assert_eq!(Felt252::decode(&mut &val[..]).unwrap(), expected_result)
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    // Tests that scale decode operation returns the right value.
+    // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
+    fn test_decode_100000000000000() {
+        let val = 0x0b00407a10f35au64.to_be_bytes();
+        let expected_result = Felt252::from_i64(100000000000000).unwrap();
+        assert_eq!(Felt252::decode(&mut &val[1..]).unwrap(), expected_result)
     }
 }
