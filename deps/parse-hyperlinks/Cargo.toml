@@ -1,0 +1,26 @@
+[package]
+name = "cairo-take_until_unbalanced"
+version = "0.29.0"
+authors = [
+    "Jens Getreu <getreu@getreu@web.de>",
+    "LambdaClass <hello@lambdaclass.com>",
+]
+edition = "2021"
+keywords = ["parser"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://gitlab.com/lambdaclass/cairo-rs"
+homepage = "https://gitlab.com/lambdaclass/cairo-rs"
+description = "A Nom parser library for contents between unbalanced tags."
+categories = ["parser-implementations"]
+
+[dependencies]
+nom = { version = "7.1.1", default-features = false }
+
+[features]
+default = ["std"]
+std = ["nom/std"]
+alloc = ["nom/alloc"]
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3.34"
