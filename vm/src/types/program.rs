@@ -95,6 +95,19 @@ impl Decode for SharedProgramData {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            Vec<MaybeRelocatable>,
+            Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
+            Option<u64>,
+            Option<u64>,
+            Option<u64>,
+            Vec<Attribute>,
+            Option<Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>>,
+            Vec<(String, Identifier)>,
+            Vec<HintReference>,
+        )>::decode(input);
+
+        log::error!("{:?}", res);
         let (
             data,
             hints,
@@ -105,17 +118,7 @@ impl Decode for SharedProgramData {
             instruction_locations,
             identifiers,
             reference_manager,
-        ) = <(
-            Vec<MaybeRelocatable>,
-            Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
-            Option<u64>,
-            Option<u64>,
-            Option<u64>,
-            Vec<Attribute>,
-            Option<Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>>,
-            Vec<(String, Identifier)>,
-            Vec<HintReference>,
-        )>::decode(input)?;
+        ) = res?;
 
         let hints = hints
             .into_iter()
