@@ -115,8 +115,7 @@ impl Decode for HintReference {
             bool,
             Option<ApTracking>,
             Option<String>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
 
         Ok(HintReference {
             offset1: res.0,

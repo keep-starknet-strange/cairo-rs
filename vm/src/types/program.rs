@@ -115,8 +115,7 @@ impl Decode for SharedProgramData {
             Option<Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>>,
             Vec<(String, Identifier)>,
             Vec<HintReference>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
 
         let hints = hints
             .into_iter()
@@ -174,8 +173,8 @@ impl Decode for Program {
             Arc<SharedProgramData>,
             Vec<(String, Felt252)>,
             Vec<BuiltinName>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
+
         let constants = <HashMap<String, Felt252>>::from_iter(res.1.into_iter());
         Ok(Program {
             shared_program_data: res.0,

@@ -109,8 +109,8 @@ impl Decode for FlowTrackingData {
         let (ap_tracking, reference_ids) = <(
             ApTracking,
             Vec<(String, [u8; core::mem::size_of::<usize>()])>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
+
         Ok(FlowTrackingData {
             ap_tracking,
             reference_ids: reference_ids
@@ -138,7 +138,8 @@ impl Decode for ApTracking {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let res = <(u64, u64)>::decode(input).unwrap();
+        let res = <(u64, u64)>::decode(input)?;
+
         Ok(ApTracking {
             group: res.0 as usize,
             offset: res.1 as usize,
@@ -229,8 +230,8 @@ impl Decode for Identifier {
             Option<u64>,
             Option<String>,
             Option<Vec<Reference>>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
+
         Ok(Identifier {
             pc: res.0.map(|v| v as usize),
             type_: res.1,
@@ -266,7 +267,8 @@ impl Decode for Member {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let res = <(String, u64)>::decode(input).unwrap();
+        let res = <(String, u64)>::decode(input)?;
+
         Ok(Member {
             cairo_type: res.0,
             offset: res.1 as usize,
@@ -311,8 +313,8 @@ impl Decode for Attribute {
             String,
             Option<FlowTrackingData>,
             Vec<String>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
+
         Ok(Attribute {
             name: res.0,
             start_pc: res.1 as usize,
@@ -430,7 +432,8 @@ impl Decode for Reference {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let res = <(ApTracking, Option<u64>, ValueAddress)>::decode(input).unwrap();
+        let res = <(ApTracking, Option<u64>, ValueAddress)>::decode(input)?;
+
         Ok(Reference {
             ap_tracking_data: res.0,
             pc: res.1.map(|v| v as usize),
