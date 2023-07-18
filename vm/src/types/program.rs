@@ -95,6 +95,7 @@ impl Decode for SharedProgramData {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
+        log::error!("rem len: {:?}", input.remaining_len());
         let res = <(
             Vec<MaybeRelocatable>,
             Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
@@ -107,7 +108,6 @@ impl Decode for SharedProgramData {
             Vec<HintReference>,
         )>::decode(input);
 
-        log::error!("{:?}", res);
         let (
             data,
             hints,
