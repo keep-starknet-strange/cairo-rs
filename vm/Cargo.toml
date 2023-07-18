@@ -80,7 +80,7 @@ ark-ff = { workspace = true, optional = true }
 ark-std = { workspace = true, optional = true }
 
 parity-scale-codec = { workspace = true, optional = true, features = [
-    "derive",
+    "derive", "chain-error"
 ] }
 
 [dev-dependencies]
