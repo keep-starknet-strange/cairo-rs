@@ -96,6 +96,11 @@ impl Decode for SharedProgramData {
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
         log::error!("rem len: {:?}", input.remaining_len());
+        let mut x = vec![0; 96345];
+        input.read(&mut x)?;
+        log::error!("rem len: {:?}", input.remaining_len());
+        log::error!("content: {:?}", x);
+
         let res = <(
             Vec<MaybeRelocatable>,
             Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
