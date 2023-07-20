@@ -175,7 +175,7 @@ impl Encode for Program {
             .constants
             .into_iter()
             .collect::<Vec<(String, Felt252)>>();
-        (val.shared_program_data, constants, val.builtins).encode()
+        ((*val.shared_program_data).clone(), constants, val.builtins).encode()
     }
 }
 #[cfg(feature = "parity-scale-codec")]
@@ -183,15 +183,11 @@ impl Decode for Program {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let res = <(
-            Arc<SharedProgramData>,
-            Vec<(String, Felt252)>,
-            Vec<BuiltinName>,
-        )>::decode(input)?;
+        let res = <(SharedProgramData, Vec<(String, Felt252)>, Vec<BuiltinName>)>::decode(input)?;
 
         let constants = <HashMap<String, Felt252>>::from_iter(res.1.into_iter());
         Ok(Program {
-            shared_program_data: res.0,
+            shared_program_data: Arc::new(res.0),
             constants,
             builtins: res.2,
         })
