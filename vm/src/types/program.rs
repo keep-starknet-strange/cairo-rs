@@ -59,14 +59,16 @@ impl Encode for SharedProgramData {
     fn encode(&self) -> Vec<u8> {
         let val = self.clone();
         // Convert the hashmap to a vec because it's encodable.
-        let hints = val
+        let hints: Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)> = val
             .hints
             .into_iter()
             .map(|(id, params)| (id.to_be_bytes(), params))
             .collect::<Vec<_>>();
 
         // Convert the hashmap to a vec because it's encodable.
-        let instruction_locations = val.instruction_locations.map(|i| {
+        let instruction_locations: Option<
+            Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>,
+        > = val.instruction_locations.map(|i| {
             i.into_iter()
                 .map(|(id, location)| (id.to_be_bytes(), location))
                 .collect::<Vec<_>>()
@@ -76,7 +78,8 @@ impl Encode for SharedProgramData {
             .identifiers
             .into_iter()
             .collect::<Vec<(String, Identifier)>>();
-        (
+
+        let x = (
             val.data,
             hints,
             val.main.map(|v| v as u64),
@@ -87,7 +90,10 @@ impl Encode for SharedProgramData {
             identifiers,
             val.reference_manager,
         )
-            .encode()
+            .encode();
+        log::error!("encoded struct len: {}", x.len());
+
+        x
     }
 }
 #[cfg(feature = "parity-scale-codec")]
