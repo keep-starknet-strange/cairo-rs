@@ -90,33 +90,36 @@ pub struct FlowTrackingData {
 }
 #[cfg(feature = "parity-scale-codec")]
 impl Encode for FlowTrackingData {
-    fn encode(&self) -> Vec<u8> {
-        let val = self.clone();
-        let reference_ids = val
+    fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
+        let reference_ids = self
             .reference_ids
-            .into_iter()
-            .map(|(id, reference)| (id, reference.to_be_bytes()))
+            .iter()
+            .map(|(s, v)| (s.clone(), v.to_be_bytes()))
             .collect::<Vec<_>>();
 
-        (val.ap_tracking, reference_ids).encode()
+        parity_scale_codec::Encode::encode_to(&self.ap_tracking, dest);
+        parity_scale_codec::Encode::encode_to(&reference_ids, dest);
     }
 }
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for FlowTrackingData {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let (ap_tracking, reference_ids) = <(
-            ApTracking,
-            Vec<(String, [u8; core::mem::size_of::<usize>()])>,
-        )>::decode(input)?;
+        let ap_tracking = <ApTracking as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `FlowTrackingData::ap_tracking`"))?;
+
+        let reference_ids =
+            <Vec<(String, [u8; core::mem::size_of::<usize>()])> as Decode>::decode(input)
+                .map_err(|e| e.chain("Could not decode `FlowTrackingData::reference_ids`"))?
+                .into_iter()
+                .map(|(s, v)| (s, usize::from_be_bytes(v)))
+                .collect::<HashMap<_, _>>();
 
         Ok(FlowTrackingData {
             ap_tracking,
-            reference_ids: reference_ids
-                .into_iter()
-                .map(|(id, reference)| (id, usize::from_be_bytes(reference)))
-                .collect::<HashMap<_, _>>(),
+            reference_ids,
         })
     }
 }
@@ -129,21 +132,29 @@ pub struct ApTracking {
 
 #[cfg(feature = "parity-scale-codec")]
 impl Encode for ApTracking {
-    fn encode(&self) -> Vec<u8> {
-        (self.group as u64, self.offset as u64).encode()
+    fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
+        let group = self.group as u64;
+        let offset = self.offset as u64;
+
+        parity_scale_codec::Encode::encode_to(&group, dest);
+        parity_scale_codec::Encode::encode_to(&offset, dest);
     }
 }
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for ApTracking {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let res = <(u64, u64)>::decode(input)?;
+        let group = <u64 as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::group`"))?
+            as usize;
 
-        Ok(ApTracking {
-            group: res.0 as usize,
-            offset: res.1 as usize,
-        })
+        let offset = <u64 as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::offset`"))?
+            as usize;
+
+        Ok(ApTracking { group, offset })
     }
 }
 

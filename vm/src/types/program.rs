@@ -56,102 +56,98 @@ pub struct SharedProgramData {
 
 #[cfg(feature = "parity-scale-codec")]
 impl Encode for SharedProgramData {
-    fn encode(&self) -> Vec<u8> {
-        let val = self.clone();
-        // Convert the hashmap to a vec because it's encodable.
-        let hints: Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)> = val
+    fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
+        let hints: Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)> = self
             .hints
-            .into_iter()
-            .map(|(id, params)| (id.to_be_bytes(), params))
+            .iter()
+            .map(|(id, params)| (id.to_be_bytes(), params.clone()))
             .collect::<Vec<_>>();
 
         // Convert the hashmap to a vec because it's encodable.
         let instruction_locations: Option<
             Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>,
-        > = val.instruction_locations.map(|i| {
-            i.into_iter()
-                .map(|(id, location)| (id.to_be_bytes(), location))
+        > = self.instruction_locations.as_ref().map(|i| {
+            i.iter()
+                .map(|(id, location)| (id.to_be_bytes(), location.clone()))
                 .collect::<Vec<_>>()
         });
-        // Convert to bytes slice because usize is not encodable.
-        let identifiers = val
+
+        let identifiers = self
             .identifiers
-            .into_iter()
+            .iter()
+            .map(|(s, i)| (s.clone(), i.clone()))
             .collect::<Vec<(String, Identifier)>>();
 
-        let x = (
-            val.data,
-            hints,
-            val.main.map(|v| v as u64),
-            val.start.map(|v| v as u64),
-            val.end.map(|v| v as u64),
-            val.error_message_attributes,
-            instruction_locations,
-            identifiers,
-            val.reference_manager,
-        )
-            .encode();
-        log::error!("encoded struct len: {}", x.len());
-
-        x
+        parity_scale_codec::Encode::encode_to(&self.data, dest);
+        parity_scale_codec::Encode::encode_to(&hints, dest);
+        parity_scale_codec::Encode::encode_to(&self.main.map(|v| v as u64), dest);
+        parity_scale_codec::Encode::encode_to(&self.start.map(|v| v as u64), dest);
+        parity_scale_codec::Encode::encode_to(&self.end.map(|v| v as u64), dest);
+        parity_scale_codec::Encode::encode_to(&self.error_message_attributes, dest);
+        parity_scale_codec::Encode::encode_to(&instruction_locations, dest);
+        parity_scale_codec::Encode::encode_to(&identifiers, dest);
+        parity_scale_codec::Encode::encode_to(&self.reference_manager, dest);
     }
 }
+
+impl parity_scale_codec::EncodeLike for SharedProgramData {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for SharedProgramData {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
         log::error!("rem len: {:?}", input.remaining_len());
-        let mut x = vec![0; 96345];
-        input.read(&mut x)?;
-        log::error!("rem len: {:?}", input.remaining_len());
-        log::error!("content: {:?}", x);
 
-        let res = <(
-            Vec<MaybeRelocatable>,
-            Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
-            Option<u64>,
-            Option<u64>,
-            Option<u64>,
-            Vec<Attribute>,
-            Option<Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>>,
-            Vec<(String, Identifier)>,
-            Vec<HintReference>,
-        )>::decode(input);
+        let data = <Vec<MaybeRelocatable> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::data`"))?;
 
-        let (
-            data,
-            hints,
-            main,
-            start,
-            end,
-            error_message_attributes,
-            instruction_locations,
-            identifiers,
-            reference_manager,
-        ) = res?;
-
-        let hints = hints
+        let hints = <Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::hints`"))?
             .into_iter()
             .map(|(id, hints)| (usize::from_be_bytes(id), hints))
             .collect::<HashMap<_, _>>();
 
-        let instruction_locations = instruction_locations.map(|il| {
+        let main = <Option<u64> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::main`"))?
+            .map(|v| v as usize);
+
+        let start = <Option<u64> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::start`"))?
+            .map(|v| v as usize);
+
+        let end = <Option<u64> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::end`"))?
+            .map(|v| v as usize);
+
+        let error_message_attributes = <Vec<Attribute> as Decode>::decode(input).map_err(|e| {
+            e.chain("Could not decode `SharedProgramData::error_message_attributes`")
+        })?;
+
+        let instruction_locations = <Option<
+            Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>,
+        >>::decode(input)
+        .map_err(|e| e.chain("Could not decode `SharedProgramData::instruction_locations`"))?
+        .map(|il| {
             il.into_iter()
                 .map(|(id, location)| (usize::from_be_bytes(id), location))
                 .collect::<HashMap<_, _>>()
         });
 
-        let identifiers = identifiers
+        let identifiers = <Vec<(String, Identifier)> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::identifiers`"))?
             .into_iter()
             .collect::<HashMap<String, Identifier>>();
+
+        let reference_manager = <Vec<HintReference> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `SharedProgramData::reference_manager`"))?;
 
         Ok(SharedProgramData {
             data,
             hints,
-            main: main.map(|v| v as usize),
-            start: start.map(|v| v as usize),
-            end: end.map(|v| v as usize),
+            main,
+            start,
+            end,
             error_message_attributes,
             instruction_locations,
             identifiers,
@@ -169,27 +165,39 @@ pub struct Program {
 
 #[cfg(feature = "parity-scale-codec")]
 impl Encode for Program {
-    fn encode(&self) -> Vec<u8> {
-        let val = self.clone();
-        let constants = val
+    fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
+        let constants = self
             .constants
-            .into_iter()
+            .iter()
+            .map(|(s, f)| (s.clone(), f.clone()))
             .collect::<Vec<(String, Felt252)>>();
-        ((*val.shared_program_data).clone(), constants, val.builtins).encode()
+
+        parity_scale_codec::Encode::encode_to(&self.shared_program_data, dest);
+        parity_scale_codec::Encode::encode_to(&constants, dest);
+        parity_scale_codec::Encode::encode_to(&self.builtins, dest);
     }
 }
+
+impl parity_scale_codec::EncodeLike for Program {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for Program {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        let res = <(SharedProgramData, Vec<(String, Felt252)>, Vec<BuiltinName>)>::decode(input)?;
+        let shared_program_data = <Arc<SharedProgramData> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `Program::shared_program_data`"))?;
+        let constants = <Vec<(String, Felt252)> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `Program::constants`"))?
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+        let builtins = <Vec<BuiltinName> as Decode>::decode(input)
+            .map_err(|e| e.chain("Could not decode `Program::builtins`"))?;
 
-        let constants = <HashMap<String, Felt252>>::from_iter(res.1.into_iter());
         Ok(Program {
-            shared_program_data: Arc::new(res.0),
+            shared_program_data,
             constants,
-            builtins: res.2,
+            builtins,
         })
     }
 }
