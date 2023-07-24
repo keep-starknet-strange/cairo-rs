@@ -96,8 +96,6 @@ impl Decode for SharedProgramData {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
-        log::error!("rem len: {:?}", input.remaining_len());
-
         let data = <Vec<MaybeRelocatable> as Decode>::decode(input)
             .map_err(|e| e.chain("Could not decode `SharedProgramData::data`"))?;
 

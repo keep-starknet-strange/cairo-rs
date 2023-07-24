@@ -233,7 +233,7 @@ dependencies = [
 [[package]]
 name = "cairo-felt"
 version = "0.6.0"
-source = "git+https://github.com/keep-starknet-strange/cairo-rs?branch=tdelabro/no_std-support-with-cairo-1#76a0ce0dbcdb9f9c327ea716448b0d2eabfd5391"
+source = "git+https://github.com/keep-starknet-strange/cairo-rs?branch=no_std-support-with-cairo-1#3f406f4a335fd3a0bf22237e493be5a9947efa7d"
 dependencies = [
  "lazy_static",
  "num-bigint",
@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "cairo-lang-casm"
 version = "2.0.0-rc2"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=tdelabro/no_std-support#127a23dd0cf4d30a4fa678bb1aad76e3c926b10e"
+source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#64ef5864c5b92ee40b46ecb0b6fd854bd790938d"
 dependencies = [
  "cairo-lang-utils",
  "hashbrown 0.14.0",
@@ -260,7 +260,7 @@ dependencies = [
 [[package]]
 name = "cairo-lang-casm-contract-class"
 version = "2.0.0-rc2"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=tdelabro/no_std-support#127a23dd0cf4d30a4fa678bb1aad76e3c926b10e"
+source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#64ef5864c5b92ee40b46ecb0b6fd854bd790938d"
 dependencies = [
  "cairo-lang-casm",
  "cairo-lang-utils",
@@ -271,9 +271,9 @@ dependencies = [
 [[package]]
 name = "cairo-lang-utils"
 version = "2.0.0-rc2"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=tdelabro/no_std-support#127a23dd0cf4d30a4fa678bb1aad76e3c926b10e"
+source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support#64ef5864c5b92ee40b46ecb0b6fd854bd790938d"
 dependencies = [
- "cairo-felt 0.6.0 (git+https://github.com/keep-starknet-strange/cairo-rs?branch=tdelabro/no_std-support-with-cairo-1)",
+ "cairo-felt 0.6.0 (git+https://github.com/keep-starknet-strange/cairo-rs?branch=no_std-support-with-cairo-1)",
  "hashbrown 0.14.0",
  "indexmap 2.0.0",
  "itertools",
@@ -313,7 +313,6 @@ dependencies = [
  "iai-callgrind",
  "keccak",
  "lazy_static",
- "log",
  "mimalloc",
  "nom",
  "num-bigint",
