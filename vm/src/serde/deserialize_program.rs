@@ -273,6 +273,7 @@ impl Decode for Identifier {
             Option<String>,
             Option<Vec<Reference>>,
         )>::decode(input)?;
+
         Ok(Identifier {
             pc: res.0.map(|v| v as usize),
             type_: res.1,
@@ -314,6 +315,7 @@ impl Decode for Member {
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
         let res = <(String, u64)>::decode(input)?;
+
         Ok(Member {
             cairo_type: res.0,
             offset: res.1 as usize,
@@ -364,6 +366,7 @@ impl Decode for Attribute {
             Option<FlowTrackingData>,
             Vec<String>,
         )>::decode(input)?;
+
         Ok(Attribute {
             name: res.0,
             start_pc: res.1 as usize,
@@ -529,6 +532,7 @@ impl Decode for Reference {
         input: &mut I,
     ) -> Result<Self, parity_scale_codec::Error> {
         let res = <(ApTracking, Option<u64>, ValueAddress)>::decode(input)?;
+
         Ok(Reference {
             ap_tracking_data: res.0,
             pc: res.1.map(|v| v as usize),
