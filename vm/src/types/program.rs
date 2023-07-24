@@ -89,6 +89,7 @@ impl Encode for SharedProgramData {
     }
 }
 
+#[cfg(feature = "parity-scale-codec")]
 impl parity_scale_codec::EncodeLike for SharedProgramData {}
 
 #[cfg(feature = "parity-scale-codec")]
@@ -173,6 +174,7 @@ impl Encode for Program {
     }
 }
 
+#[cfg(feature = "parity-scale-codec")]
 impl parity_scale_codec::EncodeLike for Program {}
 
 #[cfg(feature = "parity-scale-codec")]

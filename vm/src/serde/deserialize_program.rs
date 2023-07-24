@@ -103,6 +103,9 @@ impl Encode for FlowTrackingData {
 }
 
 #[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for FlowTrackingData {}
+
+#[cfg(feature = "parity-scale-codec")]
 impl Decode for FlowTrackingData {
     fn decode<I: parity_scale_codec::Input>(
         input: &mut I,
@@ -139,6 +142,9 @@ impl Encode for ApTracking {
         parity_scale_codec::Encode::encode_to(&offset, dest);
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for ApTracking {}
 
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for ApTracking {
@@ -224,6 +230,10 @@ impl Encode for Identifier {
             .encode()
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for Identifier {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for Identifier {
     fn decode<I: parity_scale_codec::Input>(
@@ -272,6 +282,10 @@ impl Encode for Member {
         (val.cairo_type, val.offset as u64).encode()
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for Member {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for Member {
     fn decode<I: parity_scale_codec::Input>(
@@ -311,6 +325,10 @@ impl Encode for Attribute {
             .encode()
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for Attribute {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for Attribute {
     fn decode<I: parity_scale_codec::Input>(
@@ -437,6 +455,10 @@ impl Encode for Reference {
             .encode()
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for Reference {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for Reference {
     fn decode<I: parity_scale_codec::Input>(
