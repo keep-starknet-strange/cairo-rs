@@ -103,6 +103,10 @@ impl Encode for HintReference {
             .encode()
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for HintReference {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for HintReference {
     fn decode<I: parity_scale_codec::Input>(
@@ -115,8 +119,7 @@ impl Decode for HintReference {
             bool,
             Option<ApTracking>,
             Option<String>,
-        )>::decode(input)
-        .unwrap();
+        )>::decode(input)?;
 
         Ok(HintReference {
             offset1: res.0,

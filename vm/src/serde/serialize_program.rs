@@ -28,7 +28,6 @@ mod tests {
     use crate::serde::deserialize_program::OffsetValue;
     use crate::serde::deserialize_program::ProgramJson;
     use crate::serde::deserialize_program::ValueAddress;
-    use crate::serde::deserialize_utils::parse_value;
     use crate::stdlib::string::ToString;
     use crate::types::instruction::Register;
     use felt::Felt252;
@@ -145,7 +144,6 @@ mod tests {
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
     fn parse_value_with_inner_deref_and_offset2() {
         let value = "[cast([ap] + 1, __main__.felt*)]";
-        println!("{:?}", parse_value(value));
 
         assert_eq!(
             value,
