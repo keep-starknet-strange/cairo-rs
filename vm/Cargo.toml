@@ -30,6 +30,7 @@ cairo-1-hints = [
 test_utils = [
     "skip_next_instruction_hint",
     "hooks",
+    "parity-scale-codec",
 ] # This feature will reference every test-oriented feature
 skip_next_instruction_hint = []
 hooks = []
