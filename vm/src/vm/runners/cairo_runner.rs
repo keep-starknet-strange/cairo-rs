@@ -1194,6 +1194,16 @@ impl MulAssign<usize> for ExecutionResources {
 
 #[cfg(feature = "parity-scale-codec")]
 impl Encode for ExecutionResources {
+    fn size_hint(&self) -> usize {
+        8 + 8
+            + 8  // counter size
+            + self
+                .builtin_instance_counter
+                .iter()
+                .map(|(k, _)| k.size_hint() + 8)
+                .sum::<usize>()
+    }
+
     fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
         Encode::encode_to(&(self.n_steps as u64), dest);
         Encode::encode_to(&(self.n_memory_holes as u64), dest);
@@ -5095,7 +5105,11 @@ mod tests {
                 ("strange".into(), 0),
             ]),
         };
+
+        let size_hint = resources.size_hint();
         let encoded = resources.encode();
+        assert!(size_hint >= encoded.len());
+
         let decoded = ExecutionResources::decode(&mut encoded.as_slice())
             .expect("Failed to decode execution resources");
         assert_eq!(resources, decoded);
