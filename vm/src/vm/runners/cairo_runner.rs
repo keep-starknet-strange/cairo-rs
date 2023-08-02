@@ -1203,8 +1203,8 @@ impl Encode for ExecutionResources {
         let n_counters_sz = crate::stdlib::mem::size_of::<u8>();
         let counters_map_sz = self
             .builtin_instance_counter
-            .iter()
-            .map(|(k, _)| k.size_hint() + 8)
+            .keys()
+            .map(|k| k.size_hint() + crate::stdlib::mem::size_of::<u64>())
             .sum::<usize>();
         n_steps_sz + n_memory_holes_sz + n_counters_sz + counters_map_sz
     }
