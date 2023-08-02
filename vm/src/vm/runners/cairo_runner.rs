@@ -1195,13 +1195,18 @@ impl MulAssign<usize> for ExecutionResources {
 #[cfg(feature = "parity-scale-codec")]
 impl Encode for ExecutionResources {
     fn size_hint(&self) -> usize {
-        8 + 8
-            + 8  // counter size
-            + self
-                .builtin_instance_counter
-                .iter()
-                .map(|(k, _)| k.size_hint() + 8)
-                .sum::<usize>()
+        let n_steps_sz = crate::stdlib::mem::size_of::<u64>();
+        let n_memory_holes_sz = crate::stdlib::mem::size_of::<u64>();
+        // There is at most one entry per builtin.
+        // Most likely there won't be more than 31 builtins.
+        // Currently there are 9 of them
+        let n_counters_sz = crate::stdlib::mem::size_of::<u8>();
+        let counters_map_sz = self
+            .builtin_instance_counter
+            .iter()
+            .map(|(k, _)| k.size_hint() + 8)
+            .sum::<usize>();
+        n_steps_sz + n_memory_holes_sz + n_counters_sz + counters_map_sz
     }
 
     fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
