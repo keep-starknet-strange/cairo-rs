@@ -50,6 +50,9 @@ use num_integer::div_rem;
 use num_traits::Zero;
 use serde::Deserialize;
 
+#[cfg(feature = "parity-scale-codec")]
+use parity_scale_codec::{Decode, Encode};
+
 use super::builtin_runner::{KeccakBuiltinRunner, PoseidonBuiltinRunner};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1239,6 +1242,55 @@ impl MulAssign<usize> for ExecutionResources {
         for (_builtin_name, counter) in self.builtin_instance_counter.iter_mut() {
             *counter *= rhs;
         }
+    }
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl Encode for ExecutionResources {
+    fn size_hint(&self) -> usize {
+        let n_steps_sz = crate::stdlib::mem::size_of::<u64>();
+        let n_memory_holes_sz = crate::stdlib::mem::size_of::<u64>();
+        // There is at most one entry per builtin.
+        // Most likely there won't be more than 31 builtins.
+        // Currently there are 9 of them
+        let n_counters_sz = crate::stdlib::mem::size_of::<u8>();
+        let counters_map_sz = self
+            .builtin_instance_counter
+            .keys()
+            .map(|k| k.size_hint() + crate::stdlib::mem::size_of::<u64>())
+            .sum::<usize>();
+        n_steps_sz + n_memory_holes_sz + n_counters_sz + counters_map_sz
+    }
+
+    fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
+        Encode::encode_to(&(self.n_steps as u64), dest);
+        Encode::encode_to(&(self.n_memory_holes as u64), dest);
+        let builtin_instance_counter: Vec<(String, u64)> = self
+            .builtin_instance_counter
+            .clone()
+            .into_iter()
+            .map(|(k, v)| (k, v as u64))
+            .collect();
+        Encode::encode_to(&builtin_instance_counter, dest);
+    }
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl Decode for ExecutionResources {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let n_steps = u64::decode(input)? as usize;
+        let n_memory_holes = u64::decode(input)? as usize;
+        let builtin_instance_counter: HashMap<String, usize> = Vec::<(String, u64)>::decode(input)?
+            .into_iter()
+            .map(|(k, v)| (k, v as usize))
+            .collect();
+        Ok(Self {
+            n_steps,
+            n_memory_holes,
+            builtin_instance_counter,
+        })
     }
 }
 
@@ -5015,5 +5067,27 @@ mod tests {
             Err(VirtualMachineError::UnfinishedExecution)
         );
         assert_eq!(hint_processor.run_resources(), &RunResources::new(0));
+    }
+
+    #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    fn test_execution_resources_scale_codec() {
+        let resources = ExecutionResources {
+            n_steps: 42,
+            n_memory_holes: 4294967297,
+            builtin_instance_counter: HashMap::from([
+                ("keep".into(), 12345),
+                ("starknet".into(), 4294967298),
+                ("strange".into(), 0),
+            ]),
+        };
+
+        let size_hint = resources.size_hint();
+        let encoded = resources.encode();
+        assert!(size_hint >= encoded.len());
+
+        let decoded = ExecutionResources::decode(&mut encoded.as_slice())
+            .expect("Failed to decode execution resources");
+        assert_eq!(resources, decoded);
     }
 }
