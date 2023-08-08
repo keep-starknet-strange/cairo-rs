@@ -377,7 +377,7 @@ impl Add<&Felt252> for u64 {
         };
         // A single digit means this is effectively the sum of two `u64` numbers.
         let Some(h0) = rhs_digits.next() else {
-            return self.checked_add(low)
+            return self.checked_add(low);
         };
         // Now we need to compare the 3 most significant digits.
         // There are two relevant cases from now on, either `rhs` behaves like a
