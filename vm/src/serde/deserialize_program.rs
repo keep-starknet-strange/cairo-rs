@@ -829,12 +829,20 @@ pub fn parse_program_json(
 }
 
 pub fn parse_program(program: Program) -> ProgramJson {
+    let hints = program
+        .shared_program_data
+        .hints_ranges
+        .iter()
+        .enumerate()
+        .filter_map(|(pc, r)| r.map(|(s, l)| (pc, (s, s + l.get()))))
+        .map(|(pc, (s, e))| (pc, program.shared_program_data.hints[s..e].to_vec()))
+        .collect();
     ProgramJson {
         prime: program.prime().to_owned(),
         builtins: program.builtins().to_vec(),
         data: program.data().to_vec(),
         identifiers: program.identifiers().to_owned(),
-        hints: program.hints().to_owned(),
+        hints: hints,
         reference_manager: program.reference_manager(),
         attributes: program.error_message_attributes().to_owned(),
         debug_info: program
