@@ -783,9 +783,8 @@ impl Cairo1HintProcessor {
                 }
                 curr += 1;
             }
-            curr += 1;
+            println!();
         }
-        println!();
 
         Ok(())
     }
