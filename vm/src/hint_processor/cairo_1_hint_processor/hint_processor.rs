@@ -90,7 +90,6 @@ impl Cairo1HintProcessor {
                 dict_end_ptr,
                 dict_index,
             })) => self.get_segment_arena_index(vm, exec_scopes, dict_end_ptr, dict_index),
-
             Hint::Core(CoreHintBase::Core(CoreHint::DivMod {
                 lhs,
                 rhs,
@@ -101,8 +100,8 @@ impl Cairo1HintProcessor {
             Hint::Core(CoreHintBase::Core(CoreHint::DebugPrint { start, end })) => {
                 self.debug_print(vm, start, end)
             }
-            #[cfg(feature = "std")]
-            Hint::Core(CoreHintBase::Core(CoreHint::DebugPrint { .. })) => {}
+            #[cfg(not(feature = "std"))]
+            Hint::Core(CoreHintBase::Core(CoreHint::DebugPrint { .. })) => Ok(()),
             Hint::Core(CoreHintBase::Core(CoreHint::Uint256SquareRoot {
                 value_low,
                 value_high,
@@ -121,11 +120,9 @@ impl Cairo1HintProcessor {
                 remainder_high,
                 sqrt_mul_2_minus_remainder_ge_u128,
             ),
-
             Hint::Core(CoreHintBase::Core(CoreHint::GetNextDictKey { next_key })) => {
                 self.get_next_dict_key(vm, exec_scopes, next_key)
             }
-
             Hint::Core(CoreHintBase::Core(CoreHint::Uint256DivMod {
                 dividend0,
                 dividend1,
@@ -155,7 +152,6 @@ impl Cairo1HintProcessor {
             Hint::Core(CoreHintBase::Core(CoreHint::AssertLeIsSecondArcExcluded {
                 skip_exclude_b_minus_a,
             })) => self.assert_le_is_second_excluded(vm, skip_exclude_b_minus_a, exec_scopes),
-
             Hint::Core(CoreHintBase::Core(CoreHint::LinearSplit {
                 value,
                 scalar,
@@ -163,21 +159,17 @@ impl Cairo1HintProcessor {
                 x,
                 y,
             })) => self.linear_split(vm, value, scalar, max_x, x, y),
-
             Hint::Core(CoreHintBase::Core(CoreHint::AllocFelt252Dict { segment_arena_ptr })) => {
                 self.alloc_felt_256_dict(vm, segment_arena_ptr, exec_scopes)
             }
-
             Hint::Core(CoreHintBase::Core(CoreHint::AssertLeFindSmallArcs {
                 range_check_ptr,
                 a,
                 b,
             })) => self.assert_le_find_small_arcs(vm, exec_scopes, range_check_ptr, a, b),
-
             Hint::Core(CoreHintBase::Core(CoreHint::RandomEcPoint { x, y })) => {
                 self.random_ec_point(vm, x, y)
             }
-
             Hint::Core(CoreHintBase::Core(CoreHint::ShouldSkipSquashLoop { should_skip_loop })) => {
                 self.should_skip_squash_loop(vm, exec_scopes, should_skip_loop)
             }
@@ -223,7 +215,6 @@ impl Cairo1HintProcessor {
                 high,
                 low,
             })) => self.wide_mul_128(vm, lhs, rhs, high, low),
-
             Hint::Core(CoreHintBase::Core(CoreHint::Uint512DivModByUint256 {
                 dividend0,
                 dividend1,
