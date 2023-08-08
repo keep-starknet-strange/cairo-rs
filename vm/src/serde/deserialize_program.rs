@@ -74,7 +74,7 @@ impl BuiltinName {
 }
 
 #[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary, Clone))]
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct ProgramJson {
     pub prime: String,
     pub builtins: Vec<BuiltinName>,
@@ -396,7 +396,7 @@ impl<'a> Arbitrary<'a> for Location {
 }
 
 #[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary, Clone))]
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct DebugInfo {
     instruction_locations: HashMap<usize, InstructionLocation>,
 }

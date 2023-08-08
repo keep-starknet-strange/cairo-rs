@@ -372,7 +372,7 @@ impl Program {
         &self.shared_program_data.data
     }
 
-    pub fn hints(&self) -> &HashMap<usize, Vec<HintParams>> {
+    pub fn hints(&self) -> &Vec<HintParams> {
         &self.shared_program_data.hints
     }
 

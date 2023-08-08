@@ -5,8 +5,6 @@ use num_traits::ToPrimitive;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
-use crate::vm::decoding::decoder::decode_instruction;
-
 #[cfg(feature = "arbitrary")]
 use arbitrary::Arbitrary;
 
