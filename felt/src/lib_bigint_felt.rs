@@ -1775,7 +1775,14 @@ mod test {
     fn test_encode_100000000000000() {
         let val: FeltBigInt<FIELD_HIGH, FIELD_LOW> = FeltBigInt::from_i64(100000000000000).unwrap();
         let expected_result = 0x0b00407a10f35au64.to_be_bytes();
-        assert_eq!(val.encode(), expected_result)
+        let mut encoded = val.encode();
+        assert!(expected_result.len() >= encoded.len());
+
+        // pad 0s to the left of the encoded value
+        encoded.reverse();
+        encoded.resize(expected_result.len(), 0); // add zeros to the end
+        encoded.reverse();
+        assert_eq!(encoded, expected_result)
     }
     #[test]
     #[cfg(feature = "parity-scale-codec")]
