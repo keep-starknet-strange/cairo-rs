@@ -1719,6 +1719,7 @@ mod test {
         assert_eq!(got, expected);
     }
 
+    #[test]
     #[cfg(feature = "parity-scale-codec")]
     // Tests that scale encode operation returns the right value.
     // We chose the value from this example https://docs.substrate.io/reference/scale-codec/.
