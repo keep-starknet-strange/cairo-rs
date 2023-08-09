@@ -1,4 +1,6 @@
-use crate::serde::deserialize_program::{parse_program, ProgramJson, Reference, ValueAddress};
+use crate::serde::deserialize_program::{
+    get_hints_tree, parse_program, ProgramJson, Reference, ValueAddress,
+};
 use crate::stdlib::{
     collections::{BTreeMap, HashMap},
     prelude::*,
@@ -102,9 +104,8 @@ impl<'a> Arbitrary<'a> for SharedProgramData {
 impl Encode for SharedProgramData {
     fn encode(&self) -> Vec<u8> {
         let val = self.clone();
-        // Convert the hashmap to a vec because it's encodable.
-        let hints = val
-            .hints
+        // Get a vector from hints because its encodeable.
+        let hints = get_hints_tree(&val)
             .into_iter()
             .collect::<Vec<(usize, Vec<HintParams>)>>();
         // Transmute to bytes slice because usize is not encodable.
@@ -161,7 +162,7 @@ impl Decode for SharedProgramData {
                     .collect::<Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>>(),
             )
         };
-        let hints = <HashMap<usize, Vec<HintParams>>>::from_iter(hints.into_iter());
+        let hints = <BTreeMap<usize, Vec<HintParams>>>::from_iter(hints.into_iter());
 
         let instruction_locations: Option<Vec<(usize, InstructionLocation)>> =
             unsafe { core::mem::transmute(res.6) };
@@ -171,10 +172,14 @@ impl Decode for SharedProgramData {
                 .map(|i| <HashMap<usize, InstructionLocation>>::from_iter(i.into_iter()));
 
         let identifiers = <HashMap<String, Identifier>>::from_iter(res.7.into_iter());
+        let data = res.0;
+
+        let (hints, hints_ranges) = Program::flatten_hints(&hints, data.len()).unwrap();
 
         Ok(SharedProgramData {
-            data: res.0,
+            data,
             hints,
+            hints_ranges,
             main: res.2.map(|v| v as usize),
             start: res.3.map(|v| v as usize),
             end: res.4.map(|v| v as usize),

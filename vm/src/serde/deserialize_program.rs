@@ -829,14 +829,7 @@ pub fn parse_program_json(
 }
 
 pub fn parse_program(program: Program) -> ProgramJson {
-    let hints = program
-        .shared_program_data
-        .hints_ranges
-        .iter()
-        .enumerate()
-        .filter_map(|(pc, r)| r.map(|(s, l)| (pc, (s, s + l.get()))))
-        .map(|(pc, (s, e))| (pc, program.shared_program_data.hints[s..e].to_vec()))
-        .collect();
+    let hints = get_hints_tree(program.shared_program_data.as_ref());
     ProgramJson {
         prime: program.prime().to_owned(),
         builtins: program.builtins().to_vec(),
@@ -854,6 +847,16 @@ pub fn parse_program(program: Program) -> ProgramJson {
         main_scope: String::default(),
         compiler_version: String::default(),
     }
+}
+
+pub fn get_hints_tree(program: &SharedProgramData) -> BTreeMap<usize, Vec<HintParams>> {
+    program
+        .hints_ranges
+        .iter()
+        .enumerate()
+        .filter_map(|(pc, r)| r.map(|(s, l)| (pc, (s, s + l.get()))))
+        .map(|(pc, (s, e))| (pc, program.hints[s..e].to_vec()))
+        .collect()
 }
 
 #[cfg(test)]
