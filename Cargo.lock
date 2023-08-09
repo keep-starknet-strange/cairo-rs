@@ -313,8 +313,8 @@ dependencies = [
 
 [[package]]
 name = "cairo-lang-casm"
-version = "2.0.1"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support-rebase#74da9b53c9e72c72571432f6e283425fa2d27a2a"
+version = "2.1.0"
+source = "git+https://github.com/apoorvsadana/cairo?branch=no_std-support-08-aug-23#145c186498ef26c5e0e89372e9e0919c2cad356a"
 dependencies = [
  "cairo-lang-utils",
  "hashbrown 0.14.0",
@@ -328,8 +328,8 @@ dependencies = [
 
 [[package]]
 name = "cairo-lang-casm-contract-class"
-version = "2.0.1"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support-rebase#74da9b53c9e72c72571432f6e283425fa2d27a2a"
+version = "2.1.0"
+source = "git+https://github.com/apoorvsadana/cairo?branch=no_std-support-08-aug-23#145c186498ef26c5e0e89372e9e0919c2cad356a"
 dependencies = [
  "cairo-lang-casm",
  "cairo-lang-utils",
@@ -341,8 +341,8 @@ dependencies = [
 
 [[package]]
 name = "cairo-lang-utils"
-version = "2.0.1"
-source = "git+https://github.com/keep-starknet-strange/cairo?branch=no_std-support-rebase#74da9b53c9e72c72571432f6e283425fa2d27a2a"
+version = "2.1.0"
+source = "git+https://github.com/apoorvsadana/cairo?branch=no_std-support-08-aug-23#145c186498ef26c5e0e89372e9e0919c2cad356a"
 dependencies = [
  "cairo-felt 0.8.1",
  "hashbrown 0.14.0",
