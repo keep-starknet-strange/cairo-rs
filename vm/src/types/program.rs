@@ -1,6 +1,6 @@
-use crate::serde::deserialize_program::{
-    get_hints_tree, parse_program, ProgramJson, Reference, ValueAddress,
-};
+#[cfg(feature = "parity-scale-codec")]
+use crate::serde::deserialize_program::get_hints_tree;
+use crate::serde::deserialize_program::{parse_program, ProgramJson, Reference, ValueAddress};
 use crate::stdlib::{
     collections::{BTreeMap, HashMap},
     prelude::*,
