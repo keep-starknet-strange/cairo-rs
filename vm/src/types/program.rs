@@ -381,6 +381,10 @@ impl Program {
         &self.shared_program_data.hints
     }
 
+    pub fn hints_ranges(&self) -> &Vec<HintRange> {
+        &self.shared_program_data.hints_ranges
+    }
+
     pub fn main(&self) -> &Option<usize> {
         &self.shared_program_data.main
     }
