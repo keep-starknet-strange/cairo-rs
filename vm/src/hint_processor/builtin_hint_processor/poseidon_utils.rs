@@ -42,11 +42,10 @@ mod tests {
     use crate::any_box;
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
-    use crate::hint_processor::hint_processor_definition::HintProcessor;
+    use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::stdlib::collections::HashMap;
     use crate::types::exec_scope::ExecutionScopes;
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::vm::vm_core::VirtualMachine;
 
     use crate::{hint_processor::builtin_hint_processor::hint_code, utils::test_utils::*};

@@ -1,7 +1,9 @@
+use serde::Serialize;
+
 pub(crate) const CELLS_PER_SIGNATURE: u32 = 2;
 pub(crate) const _INPUTCELLS_PER_SIGNATURE: u32 = 2;
 
-#[derive(Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq)]
 pub(crate) struct EcdsaInstanceDef {
     pub(crate) ratio: Option<u32>,
     pub(crate) _repetitions: u32,

@@ -1,7 +1,9 @@
+use serde::Serialize;
+
 pub(crate) const CELLS_PER_POSEIDON: u32 = 6;
 pub(crate) const INPUT_CELLS_PER_POSEIDON: u32 = 3;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub(crate) struct PoseidonInstanceDef {
     pub(crate) ratio: Option<u32>,
 }

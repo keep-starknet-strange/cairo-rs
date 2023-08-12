@@ -7,9 +7,13 @@ edition = "2021"
 cairo-felt = { path = "../felt", default-features = false, features = [
     "alloc",
 ] }
-cairo-vm = { path = "../vm", default-features = false }
+cairo-vm = { path = "../vm", default-features = false, features = ["cairo-1-hints"] }
 
-wee_alloc = "0.4.5"
+esp-alloc = "0.3.0"
+
+[features]
+default = ["lambdaworks-felt"]
+lambdaworks-felt = ["cairo-felt/lambdaworks-felt"]
 
 
 [profile.dev]

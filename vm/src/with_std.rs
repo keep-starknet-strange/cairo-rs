@@ -29,6 +29,6 @@ pub mod with_std {
     pub use std::vec;
 
     pub mod collections {
-        pub use std::collections::{HashMap, HashSet};
+        pub use std::collections::{BTreeMap, HashMap, HashSet};
     }
 }

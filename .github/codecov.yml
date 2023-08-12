@@ -9,4 +9,3 @@ ignore:
   - vm/src/types/errors
   - hint_accountant
   - vm/src/hint_processor/cairo-1-hint-processor # TODO: Remove this line
-  - ./deps

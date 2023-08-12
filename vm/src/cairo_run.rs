@@ -3,7 +3,7 @@ use crate::{
     types::program::Program,
     vm::{
         errors::{cairo_run_errors::CairoRunError, vm_exception::VmException},
-        runners::cairo_runner::{CairoRunner, RunResources},
+        runners::cairo_runner::CairoRunner,
         security::verify_secure_runner,
         vm_core::VirtualMachine,
     },
@@ -12,18 +12,36 @@ use crate::{
 use bincode::enc::write::Writer;
 use felt::Felt252;
 
-#[cfg(feature = "std")]
-use thiserror::Error;
-#[cfg(not(feature = "std"))]
 use thiserror_no_std::Error;
 
+#[cfg(feature = "arbitrary")]
+use arbitrary::{self, Arbitrary, Unstructured};
+
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 pub struct CairoRunConfig<'a> {
     pub entrypoint: &'a str,
     pub trace_enabled: bool,
     pub relocate_mem: bool,
+    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_layout))]
     pub layout: &'a str,
     pub proof_mode: bool,
     pub secure_run: Option<bool>,
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_layout<'a>(u: &mut Unstructured) -> arbitrary::Result<&'a str> {
+    let layouts = [
+        "plain",
+        "small",
+        "dex",
+        "starknet",
+        "starknet_with_keccak",
+        "recursive_large_output",
+        "all_cairo",
+        "all_solidity",
+        "dynamic",
+    ];
+    Ok(u.choose(&layouts)?)
 }
 
 impl<'a> Default for CairoRunConfig<'a> {
@@ -59,11 +77,55 @@ pub fn cairo_run(
     let mut vm = VirtualMachine::new(cairo_run_config.trace_enabled);
     let end = cairo_runner.initialize(&mut vm)?;
     // check step calculation
-    let mut run_resources = RunResources::default();
 
     cairo_runner
-        .run_until_pc(end, &mut run_resources, &mut vm, hint_executor)
+        .run_until_pc(end, &mut vm, hint_executor)
         .map_err(|err| VmException::from_vm_error(&cairo_runner, &vm, err))?;
+    cairo_runner.end_run(false, false, &mut vm, hint_executor)?;
+
+    vm.verify_auto_deductions()?;
+    cairo_runner.read_return_values(&mut vm)?;
+    if cairo_run_config.proof_mode {
+        cairo_runner.finalize_segments(&mut vm)?;
+    }
+    if secure_run {
+        verify_secure_runner(&cairo_runner, true, None, &mut vm)?;
+    }
+    cairo_runner.relocate(&mut vm, cairo_run_config.relocate_mem)?;
+
+    Ok((cairo_runner, vm))
+}
+
+#[cfg(feature = "arbitrary")]
+pub fn cairo_run_fuzzed_program(
+    program: Program,
+    cairo_run_config: &CairoRunConfig,
+    hint_executor: &mut dyn HintProcessor,
+    steps_limit: usize,
+) -> Result<(CairoRunner, VirtualMachine), CairoRunError> {
+    use crate::vm::errors::vm_errors::VirtualMachineError;
+
+    let secure_run = cairo_run_config
+        .secure_run
+        .unwrap_or(!cairo_run_config.proof_mode);
+
+    let mut cairo_runner = CairoRunner::new(
+        &program,
+        cairo_run_config.layout,
+        cairo_run_config.proof_mode,
+    )?;
+
+    let mut vm = VirtualMachine::new(cairo_run_config.trace_enabled);
+
+    let _end = cairo_runner.initialize(&mut vm)?;
+
+    let res = match cairo_runner.run_until_steps(steps_limit, &mut vm, hint_executor) {
+        Err(VirtualMachineError::EndOfProgram(_remaining)) => Ok(()), // program ran OK but ended before steps limit
+        res => res,
+    };
+
+    res.map_err(|err| VmException::from_vm_error(&cairo_runner, &vm, err))?;
+
     cairo_runner.end_run(false, false, &mut vm, hint_executor)?;
 
     vm.verify_auto_deductions()?;
@@ -156,7 +218,7 @@ mod tests {
             .map_err(CairoRunError::Runner)?;
 
         assert!(cairo_runner
-            .run_until_pc(end, &mut RunResources::default(), &mut vm, hint_processor)
+            .run_until_pc(end, &mut vm, hint_processor)
             .is_ok());
 
         Ok((cairo_runner, vm))
@@ -176,12 +238,7 @@ mod tests {
 
         let end = cairo_runner.initialize(&mut vm).unwrap();
         assert!(cairo_runner
-            .run_until_pc(
-                end,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor
-            )
+            .run_until_pc(end, &mut vm, &mut hint_processor)
             .is_ok());
         assert!(cairo_runner.relocate(&mut vm, true).is_ok());
         // `main` returns without doing nothing, but `not_main` sets `[ap]` to `1`
@@ -301,12 +358,7 @@ mod tests {
         let mut vm = vm!();
         let end = cairo_runner.initialize(&mut vm).unwrap();
         assert!(cairo_runner
-            .run_until_pc(
-                end,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor
-            )
+            .run_until_pc(end, &mut vm, &mut hint_processor)
             .is_ok());
         assert!(cairo_runner.relocate(&mut vm, false).is_ok());
         assert!(vm.get_relocated_trace().is_err());

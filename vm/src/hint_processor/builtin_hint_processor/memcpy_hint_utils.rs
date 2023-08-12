@@ -2,17 +2,13 @@ use crate::stdlib::{any::Any, collections::HashMap, prelude::*};
 
 use crate::{
     hint_processor::{
-        builtin_hint_processor::hint_utils::{
-            get_integer_from_var_name, insert_value_from_var_name, insert_value_into_ap,
-        },
+        builtin_hint_processor::hint_utils::{get_integer_from_var_name, insert_value_into_ap},
         hint_processor_definition::HintReference,
     },
     serde::deserialize_program::ApTracking,
     types::exec_scope::ExecutionScopes,
     vm::{errors::hint_errors::HintError, vm_core::VirtualMachine},
 };
-use felt::Felt252;
-use num_traits::{One, Zero};
 
 //Implements hint: memory[ap] = segments.add()
 pub fn add_segment(vm: &mut VirtualMachine) -> Result<(), HintError> {
@@ -46,38 +42,6 @@ pub fn memcpy_enter_scope(
     Ok(())
 }
 
-// Implements hint:
-// %{
-//     n -= 1
-//     ids.continue_copying = 1 if n > 0 else 0
-// %}
-pub fn memcpy_continue_copying(
-    vm: &mut VirtualMachine,
-    exec_scopes: &mut ExecutionScopes,
-    ids_data: &HashMap<String, HintReference>,
-    ap_tracking: &ApTracking,
-) -> Result<(), HintError> {
-    // get `n` variable from vm scope
-    let n = exec_scopes.get_ref::<Felt252>("n")?;
-    // this variable will hold the value of `n - 1`
-    let new_n = n - 1;
-    // if it is positive, insert 1 in the address of `continue_copying`
-    // else, insert 0
-    if new_n.is_zero() {
-        insert_value_from_var_name("continue_copying", &new_n, vm, ids_data, ap_tracking)?;
-    } else {
-        insert_value_from_var_name(
-            "continue_copying",
-            Felt252::one(),
-            vm,
-            ids_data,
-            ap_tracking,
-        )?;
-    }
-    exec_scopes.insert_value("n", new_n);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,6 +49,7 @@ mod tests {
     use crate::utils::test_utils::*;
     use assert_matches::assert_matches;
 
+    use felt::Felt252;
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
 

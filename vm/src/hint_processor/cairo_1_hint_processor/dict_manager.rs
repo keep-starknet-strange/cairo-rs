@@ -56,13 +56,13 @@ impl DictManagerExecScope {
 
     /// Returns a reference for a dict tracker corresponding to a given pointer to a dict segment.
     fn get_dict_tracker(&self, dict_end: Relocatable) -> Result<&DictTrackerExecScope, HintError> {
-        self.trackers
-            .get(&dict_end.segment_index)
-            .ok_or(HintError::CustomHint(
+        self.trackers.get(&dict_end.segment_index).ok_or_else(|| {
+            HintError::CustomHint(
                 "The given value does not point to a known dictionary."
                     .to_string()
                     .into_boxed_str(),
-            ))
+            )
+        })
     }
 
     /// Returns a mut reference for a dict tracker corresponding to a given pointer to a dict
@@ -108,15 +108,12 @@ impl DictSquashExecScope {
     /// Removes the current key, and its access indices. Should be called when only the
     /// last key access is in the corresponding indices list.
     pub fn pop_current_key(&mut self) -> Result<(), HintError> {
-        let current_key = self.current_key().ok_or(HintError::CustomHint(
-            "Failed to get current key".to_string().into_boxed_str(),
-        ))?;
-        let key_accesses =
-            self.access_indices
-                .remove(&current_key)
-                .ok_or(HintError::CustomHint(
-                    format!("No key accesses for key {current_key}").into_boxed_str(),
-                ))?;
+        let current_key = self.current_key().ok_or_else(|| {
+            HintError::CustomHint("Failed to get current key".to_string().into_boxed_str())
+        })?;
+        let key_accesses = self.access_indices.remove(&current_key).ok_or_else(|| {
+            HintError::CustomHint(format!("No key accesses for key {current_key}").into_boxed_str())
+        })?;
         if !key_accesses.len().is_one() {
             return Err(HintError::CustomHint(
                 "Key popped but not all accesses were processed."

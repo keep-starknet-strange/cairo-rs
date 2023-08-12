@@ -11,8 +11,10 @@
 **/*.swp
 bench/results
 .python-version
-cairo-rs-env/*
-cairo-rs-pypy-env/*
-cairo/
+cairo-vm-env/*
+cairo-vm-pypy-env/*
+/cairo1/
+/cairo2/
+*.tar
 
 ensure-no_std/Cargo.lock

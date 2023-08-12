@@ -3,9 +3,6 @@
 
 use crate::stdlib::prelude::*;
 
-#[cfg(feature = "std")]
-use thiserror::Error;
-#[cfg(not(feature = "std"))]
 use thiserror_no_std::Error;
 
 use crate::{
@@ -56,7 +53,7 @@ pub enum VirtualMachineError {
     UnconstrainedResJumpRel,
     #[error("Res.UNCONSTRAINED cannot be used with Opcode.ASSERT_EQ")]
     UnconstrainedResAssertEq,
-    #[error("An integer value as Res cannot be used with PcUpdate.JUMP_REL")]
+    #[error("A relocatable value as Res cannot be used with PcUpdate.JUMP_REL")]
     JumpRelNotInt,
     #[error(
         "Failed to compute Res.MUL: Could not complete computation of non pure values {} * {}", (*.0).0, (*.0).1
@@ -128,6 +125,8 @@ pub enum VirtualMachineError {
     MissingAccessedAddresses,
     #[error("Failed to write the output builtin content")]
     FailedToWriteOutput,
+    #[error("Failed to find index {0} in the vm's relocation table")]
+    RelocationNotFound(usize),
 }
 
 #[cfg(test)]

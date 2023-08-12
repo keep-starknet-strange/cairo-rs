@@ -34,7 +34,7 @@ These ids are nothing more than the index of a reference inside the `references`
             }
         ]
 ```
-So here the elements 0 and 1 of the `references` list, hold information about variables `var_a` and `var_b`, repectively.
+So here the elements 0 and 1 of the `references` list, hold information about variables `var_a` and `var_b`, respectively.
 
 The `value` key is the one that holds information about the value of that variable in memory and its type. The parsing of these strings is done with Nom.
 

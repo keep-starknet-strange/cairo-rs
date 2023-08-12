@@ -95,7 +95,7 @@ impl<'a> From<&BigUint> for Uint256<'a> {
 impl<'a> From<Felt252> for Uint256<'a> {
     fn from(value: Felt252) -> Self {
         let low = Felt252::new(u128::MAX) & &value;
-        let high = value >> 128;
+        let high = value >> 128_u32;
         Self::from_values(low, high)
     }
 }
@@ -231,11 +231,7 @@ pub fn split_64(
     let a = get_integer_from_var_name("a", vm, ids_data, ap_tracking)?;
     let mut digits = a.iter_u64_digits();
     let low = Felt252::new(digits.next().unwrap_or(0u64));
-    let high = if digits.len() <= 1 {
-        Felt252::new(digits.next().unwrap_or(0u64))
-    } else {
-        a.as_ref().shr(64_u32)
-    };
+    let high = a.as_ref() >> 64_u32;
     insert_value_from_var_name("high", high, vm, ids_data, ap_tracking)?;
     insert_value_from_var_name("low", low, vm, ids_data, ap_tracking)
 }
@@ -435,10 +431,10 @@ pub fn uint256_mul_div_mod(
     let div_high = div_high.as_ref();
 
     // Main Logic
-    let a = a_high.shl(128_usize) + a_low;
-    let b = b_high.shl(128_usize) + b_low;
-    let div = div_high.shl(128_usize) + div_low;
-    let (quotient, remainder) = (a.to_biguint() * b.to_biguint()).div_mod_floor(&div.to_biguint());
+    let a = a_high.to_biguint().shl(128_usize) + a_low.to_biguint();
+    let b = b_high.to_biguint().shl(128_usize) + b_low.to_biguint();
+    let div = div_high.to_biguint().shl(128_usize) + div_low.to_biguint();
+    let (quotient, remainder) = (a * b).div_mod_floor(&div);
 
     // ids.quotient_low.low
     vm.insert_value(
@@ -474,7 +470,6 @@ pub fn uint256_mul_div_mod(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         any_box,
         hint_processor::{
@@ -482,7 +477,7 @@ mod tests {
                 builtin_hint_processor_definition::{BuiltinHintProcessor, HintProcessorData},
                 hint_code,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::{
             exec_scope::ExecutionScopes,

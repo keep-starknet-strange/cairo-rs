@@ -12,7 +12,10 @@ use core::{
     },
 };
 
-use crate::{FeltOps, ParseFeltError};
+use crate::{lib_bigint_felt::FeltOps, ParseFeltError};
+
+#[cfg(all(feature = "std", feature = "arbitrary"))]
+use arbitrary::Arbitrary;
 
 pub const FIELD_HIGH: u128 = (1 << 123) + (17 << 64); // this is equal to 10633823966279327296825105735305134080
 pub const FIELD_LOW: u128 = 1;
@@ -20,8 +23,9 @@ use lazy_static::lazy_static;
 use num_bigint::{BigInt, BigUint, ToBigInt, U64Digits};
 use num_integer::Integer;
 use num_traits::{Bounded, FromPrimitive, Num, One, Pow, Signed, ToPrimitive, Zero};
+#[cfg(feature = "parity-scale-codec")]
+use parity_scale_codec::{Decode, Encode, Output};
 use serde::{Deserialize, Serialize};
-
 lazy_static! {
     static ref CAIRO_PRIME_BIGUINT: BigUint =
         (Into::<BigUint>::into(FIELD_HIGH) << 128) + Into::<BigUint>::into(FIELD_LOW);
@@ -31,9 +35,86 @@ lazy_static! {
         .expect("Conversion BigUint -> BigInt can't fail");
 }
 
+#[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary))]
 #[derive(Eq, Hash, PartialEq, PartialOrd, Ord, Clone, Deserialize, Default, Serialize)]
 pub(crate) struct FeltBigInt<const PH: u128, const PL: u128> {
     val: BigUint,
+}
+#[cfg(feature = "parity-scale-codec")]
+impl<const PH: u128, const PL: u128> Encode for FeltBigInt<PH, PL> {
+    fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+        // Scale codec has its own way of representing data. The first 2 bits of the first
+        // byte determines the type of data it is.
+        // NOTE: The compact byte (first byte) is encoded in LE.
+        // This implementation is highly ispired from this: https://github.com/polkascan/py-scale-codec
+        if self <= &Self::from_u16(0b00111111).unwrap() {
+            // 0b00: single-byte mode; upper six bits are the LE encoding of the value (valid only for values of 0-63).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to append the 0b00 prefix to the number in little endian.
+            let encoded = self.val.to_u8().unwrap() << 2;
+            dest.write(&[encoded]);
+        } else if self <= &Self::from_u16(0b0011111111111111).unwrap() {
+            // 0b01: two-byte mode: upper six bits and the following byte is the LE encoding of the value (valid only for values 64-(2**14-1)).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to have 0b00 at the end of the number then we apply | 0b01 to append the 0b01 prefix to the number in little endian.
+            let encoded = self.val.to_u16().unwrap() << 2 | 0b01;
+            dest.write(&encoded.to_le_bytes());
+        } else if self <= &Self::from_u32(0b00111111111111111111111111111111).unwrap() {
+            // 0b10: four-byte mode: upper six bits and the following three bytes are the LE encoding of the value (valid only for values (2**14)-(2**30-1)).
+            // Safe to unwrap because we checked the value right before.
+            // We shift left by 2 bits to have 0b00 at the end of the number then we apply | 0b10 to append the 0b10 prefix to the number in little endian.
+            let encoded = self.val.to_u32().unwrap() << 2 | 0b10;
+            dest.write(&encoded.to_le_bytes());
+        } else {
+            // 0b11: Big-integer mode: The upper six bits are the number of bytes following, plus four.
+            // The value is contained, LE encoded, in the bytes following.
+            // The final (most significant) byte must be non-zero. Valid only for values (2**30)-(2**536-1).
+            let bytes = self.val.to_bytes_le();
+            let mut encoded_value = vec![((bytes.len() - 4) << 2 | 0b11).to_le_bytes()[0]];
+            // For example for val = 100000000000000 we would have:
+            // first byte : 0b11011000 == 11_u8
+            // All the bytes [11, 0, 64, 122, 16, 243, 90]
+            // Hex: 0x0b00407a10f35a
+            // see this example: https://docs.substrate.io/reference/scale-codec/
+            // To verify the result you can run this python snippet:
+            // hex(int.from_bytes(bytes([11, 0, 64, 122, 16, 243, 90]), 'big'))
+            encoded_value.extend(bytes.iter());
+            dest.write(&encoded_value)
+        }
+    }
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl<const PH: u128, const PL: u128> Decode for FeltBigInt<PH, PL> {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let compact_byte = input.read_byte()?;
+        let compact_length = match compact_byte % 4 {
+            0 => 1,
+            1 => 2,
+            2 => 4,
+            _ => 5 + (compact_byte - 3) / 4,
+        };
+        Ok(if compact_length == 1 {
+            Self {
+                val: BigUint::from_bytes_le(&[compact_byte]) / BigUint::from_u8(4).unwrap(),
+            }
+        } else if [2, 4].contains(&compact_length) {
+            let mut buffer = vec![0; compact_length as usize - 1];
+            input.read(&mut buffer)?;
+            Self {
+                val: BigUint::from_bytes_le(&[vec![compact_byte], buffer].concat())
+                    / BigUint::from_u8(4).unwrap(),
+            }
+        } else {
+            let mut buffer = vec![0; compact_length as usize - 1];
+            input.read(&mut buffer)?;
+            Self {
+                val: BigUint::from_bytes_le(&buffer),
+            }
+        })
+    }
 }
 
 macro_rules! from_integer {
@@ -170,11 +251,11 @@ impl FeltOps for FeltBigInt<FIELD_HIGH, FIELD_LOW> {
     }
 
     fn from_bytes_be(bytes: &[u8]) -> FeltBigInt<FIELD_HIGH, FIELD_LOW> {
-        let mut value = BigUint::from_bytes_be(bytes);
-        if value >= *CAIRO_PRIME_BIGUINT {
-            value = value.mod_floor(&CAIRO_PRIME_BIGUINT);
-        }
-        Self::from(value)
+        Self::from(BigUint::from_bytes_be(bytes))
+    }
+
+    fn from_bytes_le(bytes: &[u8]) -> FeltBigInt<FIELD_HIGH, FIELD_LOW> {
+        Self::from(BigUint::from_bytes_le(bytes))
     }
 
     #[cfg(any(feature = "std", feature = "alloc"))]
@@ -837,12 +918,6 @@ impl<const PH: u128, const PL: u128> fmt::Display for FeltBigInt<PH, PL> {
 impl<const PH: u128, const PL: u128> fmt::Debug for FeltBigInt<PH, PL> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val)
-    }
-}
-
-impl fmt::Display for ParseFeltError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{ParseFeltError:?}")
     }
 }
 

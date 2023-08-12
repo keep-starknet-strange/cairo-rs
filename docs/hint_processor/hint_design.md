@@ -1,12 +1,12 @@
-# StarkNet cairo-rs hint design thoughts
+# StarkNet cairo-vm hint design thoughts
 
 ## Requirements for hints
-- Must cairo-rs support reuse of existing hints in starknet? Is it enough to enable re-writing these hints as python-embedded-in-cairo that uses a new API to interface with the cairo-rs VM state?
+- Must cairo-vm support reuse of existing hints in starknet? Is it enough to enable re-writing these hints as python-embedded-in-cairo that uses a new API to interface with the cairo-vm VM state?
 - Aside from mutable access to the memory manager and the registers, what do non-builtin hints require in terms of mutating the VM state? Is there anything that is explicitly not allowed or desirable, or that is currently allowed but would be better restricted?
 - What is the medium-long term plan for hints? Be able to implement hints as rust-embedded-in-cairo, support python hints ad aeternum, add support for more languages?
-- We should go through the implementation of the syscall hints and think how they can be implemented with the current cairo-rs code, what is missing, etc.
+- We should go through the implementation of the syscall hints and think how they can be implemented with the current cairo-vm code, what is missing, etc.
 
-Required functionality that is currently not implemented by cairo-rs:
+Required functionality that is currently not implemented by cairo-vm:
 - Temporary Segments: 
   - segments.add_temp_segment()
   - (this segments is also relocated -> check for added relocation rules)
@@ -21,7 +21,7 @@ Required functionality that is currently not implemented by cairo-rs:
 0. Manually adding hint implementations (current way)
 
 Notes
-- depend on cairo-rs
+- depend on cairo-vm
 - create helper crate with new hint implementations
 - instantiate cairo vm in your rust program
 - instantiate hint runner, set up with hints from the custom hint helper crate
@@ -37,9 +37,9 @@ Notes
 
 Notes
 - Create new crate, with a new hint runner, building on top of the builtinrunner but adding an embedded python interpreter
-- How to provide the embedded python interpreter access to cairo-rs VM state?
+- How to provide the embedded python interpreter access to cairo-vm VM state?
 - How hard will converting between type representations be? 
-- One possibility that can be explored is writing a new implementation of MemorySegmentManager in python which works together with the python embedding mechanism, so that hints that get passed a reference to the MSM will be able to access cairo-rs instead of the python vm
+- One possibility that can be explored is writing a new implementation of MemorySegmentManager in python which works together with the python embedding mechanism, so that hints that get passed a reference to the MSM will be able to access cairo-vm instead of the python vm
 - Another possibility that might be necessary is modifying the starknet hints in python to use a new interface mechanism.
 - Of the three embedding options, cpython seems the most straightforward but also limited, pyo3 the most powerful, and rustpython the least mature
 - From [here](https://www.infoworld.com/article/3664124/how-to-use-rust-with-python-and-python-with-rust.html):
@@ -51,11 +51,11 @@ Notes
       This guideline also applies generally to integrations between Python and other code that uses the Python C ABI, such as Cython modules.
 
 2. Protocol + external process
-    - Run python cairo & starknet code in a separate python process started by cairo-rs, with RPC style communication
+    - Run python cairo & starknet code in a separate python process started by cairo-vm, with RPC style communication
 	- How to provide access to vm state, and allow state modification by hints?
-	- Should the hint code running in python intermittingly call an API to modify cairo-rs VM state, or should it run in completion, and send changes back to cairo-rs once done?
+	- Should the hint code running in python intermittingly call an API to modify cairo-vm VM state, or should it run in completion, and send changes back to cairo-vm once done?
 	- Should this protocol send and receive a full vm state representation, or just some representation of the changes to state made by the hint?
-	- Open question: aside from the api to indirectly modify cairo-rs vm state, what else is needed to allow hints to run? dependencies?
+	- Open question: aside from the api to indirectly modify cairo-vm vm state, what else is needed to allow hints to run? dependencies?
 	- How will having this python codebase affect testing, packaging, running, etc?
 	- (+) more easily extensible to other languages?
 	- (-) likely more overhead from state (de)serialization
@@ -67,11 +67,11 @@ Notes
 Notes
 - Learn to use wasm tooling
 - Learn how to compile python to wasm
-- Definir the interfaces between the embedded wasm vm and cairo-rs
+- Define the interfaces between the embedded wasm vm and cairo-vm
 - (-) More unknowns & possibly greater resulting complexity
 - (+) Greater flexibility, extensibility, and possibly performance
 
-4. instead of embedding python un rust, do it the other way and embed cairo-rs in python cairo, replacing the current vm
+4. instead of embedding python un rust, do it the other way and embed cairo-vm in python cairo, replacing the current vm
      - Many questions, such doubt
 
 ---

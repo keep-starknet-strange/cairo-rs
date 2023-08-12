@@ -2,10 +2,7 @@ use crate::{
     hint_processor::{
         builtin_hint_processor::{
             hint_utils::{insert_value_from_var_name, insert_value_into_ap},
-            secp::{
-                bigint_utils::Uint384,
-                secp_utils::{bigint3_pack, SECP_P},
-            },
+            secp::{bigint_utils::Uint384, secp_utils::SECP_P},
         },
         hint_processor_definition::HintReference,
     },
@@ -38,7 +35,7 @@ pub fn verify_zero(
     secp_p: &BigInt,
 ) -> Result<(), HintError> {
     exec_scopes.insert_value("SECP_P", secp_p.clone());
-    let val = bigint3_pack(Uint384::from_var_name("val", vm, ids_data, ap_tracking)?);
+    let val = Uint384::from_var_name("val", vm, ids_data, ap_tracking)?.pack86();
     let (q, r) = val.div_rem(secp_p);
     if !r.is_zero() {
         return Err(HintError::SecpVerifyZero(Box::new(val)));
@@ -64,7 +61,7 @@ pub fn verify_zero_with_external_const(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let secp_p = exec_scopes.get_ref("SECP_P")?;
-    let val = bigint3_pack(Uint384::from_var_name("val", vm, ids_data, ap_tracking)?);
+    let val = Uint384::from_var_name("val", vm, ids_data, ap_tracking)?.pack86();
     let (q, r) = val.div_rem(secp_p);
     if !r.is_zero() {
         return Err(HintError::SecpVerifyZero(Box::new(val)));
@@ -88,7 +85,7 @@ pub fn reduce(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     exec_scopes.insert_value("SECP_P", SECP_P.clone());
-    let value = bigint3_pack(Uint384::from_var_name("x", vm, ids_data, ap_tracking)?);
+    let value = Uint384::from_var_name("x", vm, ids_data, ap_tracking)?.pack86();
     exec_scopes.insert_value("value", value.mod_floor(&SECP_P));
     Ok(())
 }
@@ -108,7 +105,7 @@ pub fn is_zero_pack(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     exec_scopes.insert_value("SECP_P", SECP_P.clone());
-    let x_packed = bigint3_pack(Uint384::from_var_name("x", vm, ids_data, ap_tracking)?);
+    let x_packed = Uint384::from_var_name("x", vm, ids_data, ap_tracking)?.pack86();
     let x = x_packed.mod_floor(&SECP_P);
     exec_scopes.insert_value("x", x);
     Ok(())
@@ -121,7 +118,7 @@ pub fn is_zero_pack_external_secp(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let secp_p = exec_scopes.get_ref("SECP_P")?;
-    let x_packed = bigint3_pack(Uint384::from_var_name("x", vm, ids_data, ap_tracking)?);
+    let x_packed = Uint384::from_var_name("x", vm, ids_data, ap_tracking)?.pack86();
     let x = x_packed.mod_floor(secp_p);
     exec_scopes.insert_value("x", x);
     Ok(())
@@ -196,7 +193,6 @@ mod tests {
     use super::*;
     use crate::hint_processor::builtin_hint_processor::hint_code;
     use crate::stdlib::string::ToString;
-    use crate::vm::runners::cairo_runner::RunResources;
 
     use crate::{
         any_box,
@@ -204,7 +200,7 @@ mod tests {
             builtin_hint_processor::builtin_hint_processor_definition::{
                 BuiltinHintProcessor, HintProcessorData,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::{
             exec_scope::ExecutionScopes,

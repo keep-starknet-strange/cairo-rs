@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 
+# move to the directory where the script is located
+cd $(dirname "$0")
+
 tests_path="../../../cairo_programs"
+proof_tests_path="${tests_path}/proof_programs"
 exit_code=0
 trace=false
 memory=false
@@ -10,10 +14,13 @@ failed_tests=0
 for i in $@; do
     case $i in
         "trace") trace=true
+        echo "Requested trace comparison"
         ;;
         "memory") memory=true
+        echo "Requested memory comparison"
         ;;
-        "proof_mode") tests_path="../../../cairo_programs/proof_programs"
+        "proof_mode") tests_path=$proof_tests_path
+        echo "Requested proof mode usage"
         ;;
         *)
         ;;
@@ -21,8 +28,9 @@ for i in $@; do
 done
 
 files=$(ls $tests_path)
-if [ $? != 0 ]; then
-    exit $?
+EXIT_CODE=$?
+if [ ${EXIT_CODE} != 0 ]; then
+    exit ${EXIT_CODE}
 fi
 
 for file in $(ls $tests_path | grep .cairo$ | sed -E 's/\.cairo$//'); do
@@ -49,10 +57,13 @@ for file in $(ls $tests_path | grep .cairo$ | sed -E 's/\.cairo$//'); do
     fi
 done
 
-if test $failed_tests = 0; then
-    echo "All $passed_tests tests passed; no discrepancies found"
-else
+if test $failed_tests != 0; then
     echo "Comparisons: $failed_tests failed, $passed_tests passed, $((failed_tests + passed_tests)) total"
+elif test $passed_tests = 0; then
+    echo "No tests ran!"
+    exit_code=2
+else
+    echo "All $passed_tests tests passed; no discrepancies found"
 fi
 
 exit "${exit_code}"

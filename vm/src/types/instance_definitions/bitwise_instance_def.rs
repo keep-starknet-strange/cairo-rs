@@ -1,7 +1,9 @@
+use serde::Serialize;
+
 pub(crate) const CELLS_PER_BITWISE: u32 = 5;
 pub(crate) const INPUT_CELLS_PER_BITWISE: u32 = 2;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub(crate) struct BitwiseInstanceDef {
     pub(crate) ratio: Option<u32>,
     pub(crate) total_n_bits: u32,

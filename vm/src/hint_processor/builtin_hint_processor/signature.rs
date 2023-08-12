@@ -45,7 +45,6 @@ pub fn verify_ecdsa_signature(
 mod tests {
     use super::*;
 
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         any_box,
         hint_processor::{
@@ -53,7 +52,7 @@ mod tests {
                 builtin_hint_processor_definition::{BuiltinHintProcessor, HintProcessorData},
                 hint_code::VERIFY_ECDSA_SIGNATURE,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::{
             exec_scope::ExecutionScopes, instance_definitions::ecdsa_instance_def::EcdsaInstanceDef,

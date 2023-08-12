@@ -1,4 +1,11 @@
-use crate::stdlib::{collections::HashMap, prelude::*, sync::Arc};
+#[cfg(feature = "parity-scale-codec")]
+use crate::serde::deserialize_program::get_hints_tree;
+use crate::serde::deserialize_program::{parse_program, ProgramJson, Reference, ValueAddress};
+use crate::stdlib::{
+    collections::{BTreeMap, HashMap},
+    prelude::*,
+    sync::Arc,
+};
 
 #[cfg(feature = "cairo-1-hints")]
 use crate::serde::deserialize_program::{ApTracking, FlowTrackingData};
@@ -6,18 +13,21 @@ use crate::{
     hint_processor::hint_processor_definition::HintReference,
     serde::deserialize_program::{
         deserialize_and_parse_program, Attribute, BuiltinName, HintParams, Identifier,
-        InstructionLocation, OffsetValue, ReferenceManager,
+        InstructionLocation, ReferenceManager,
     },
-    types::{
-        errors::program_errors::ProgramError, instruction::Register, relocatable::MaybeRelocatable,
-    },
+    types::{errors::program_errors::ProgramError, relocatable::MaybeRelocatable},
 };
 #[cfg(feature = "cairo-1-hints")]
-use cairo_lang_starknet::casm_contract_class::CasmContractClass;
+use cairo_lang_casm_contract_class::CasmContractClass;
+use core::num::NonZeroUsize;
 use felt::{Felt252, PRIME_STR};
-
+#[cfg(feature = "parity-scale-codec")]
+use parity_scale_codec::{Decode, Encode};
 #[cfg(feature = "std")]
 use std::path::Path;
+
+#[cfg(all(feature = "arbitrary", feature = "std"))]
+use arbitrary::{Arbitrary, Unstructured};
 
 // NOTE: `Program` has been split in two containing some data that will be deep-copied
 // and some that will be allocated on the heap inside an `Arc<_>`.
@@ -25,7 +35,7 @@ use std::path::Path;
 // a `CairoRunner` becomes a bottleneck, but the following solutions were tried and
 // discarded:
 // - Store only a reference in `CairoRunner` rather than cloning; this doesn't work
-//   because then we need to introduce explicit lifetimes, which broke `cairo-rs-py`
+//   because then we need to introduce explicit lifetimes, which broke `cairo-vm-py`
 //   since PyO3 doesn't support Python objects containing structures with lifetimes.
 // - Directly pass an `Arc<Program>` to `CairoRunner::new()` and simply copy that:
 //   there was a prohibitive performance hit of 10-15% when doing so, most likely
@@ -41,9 +51,11 @@ use std::path::Path;
 // failures.
 // Fields in `Program` (other than `SharedProgramData` itself) are used by the main logic.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
-pub(crate) struct SharedProgramData {
+pub struct SharedProgramData {
     pub(crate) data: Vec<MaybeRelocatable>,
-    pub(crate) hints: HashMap<usize, Vec<HintParams>>,
+    pub(crate) hints: Vec<HintParams>,
+    /// This maps a PC to the range of hints in `hints` that correspond to it.
+    pub(crate) hints_ranges: Vec<HintRange>,
     pub(crate) main: Option<usize>,
     //start and end labels will only be used in proof-mode
     pub(crate) start: Option<usize>,
@@ -54,11 +66,173 @@ pub(crate) struct SharedProgramData {
     pub(crate) reference_manager: Vec<HintReference>,
 }
 
+#[cfg(all(feature = "arbitrary", feature = "std"))]
+impl<'a> Arbitrary<'a> for SharedProgramData {
+    /// Create an arbitary [`SharedProgramData`] using `flatten_hints` to generate `hints` and
+    /// `hints_ranges`
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut data = Vec::new();
+        let len = usize::arbitrary(u)?;
+        for i in 0..len {
+            let instruction = u64::arbitrary(u)?;
+            data.push(MaybeRelocatable::from(Felt252::from(instruction)));
+            // Check if the Imm flag is on and add an immediate value if it is
+            if instruction & 0x0004000000000000 != 0 && i < len - 1 {
+                data.push(MaybeRelocatable::from(Felt252::arbitrary(u)?));
+            }
+        }
+
+        let raw_hints = BTreeMap::<usize, Vec<HintParams>>::arbitrary(u)?;
+        let (hints, hints_ranges) = Program::flatten_hints(&raw_hints, data.len())
+            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+        Ok(SharedProgramData {
+            data,
+            hints,
+            hints_ranges,
+            main: Option::<usize>::arbitrary(u)?,
+            start: Option::<usize>::arbitrary(u)?,
+            end: Option::<usize>::arbitrary(u)?,
+            error_message_attributes: Vec::<Attribute>::arbitrary(u)?,
+            instruction_locations: Option::<HashMap<usize, InstructionLocation>>::arbitrary(u)?,
+            identifiers: HashMap::<String, Identifier>::arbitrary(u)?,
+            reference_manager: Vec::<HintReference>::arbitrary(u)?,
+        })
+    }
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl Encode for SharedProgramData {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        // Get a vector from hints because its encodeable.
+        let hints = get_hints_tree(&val)
+            .into_iter()
+            .collect::<Vec<(usize, Vec<HintParams>)>>();
+        // Transmute to bytes slice because usize is not encodable.
+        let hints: Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)> =
+            unsafe { core::mem::transmute(hints) };
+
+        // Convert the hashmap to a vec because it's encodable.
+        let instruction_locations = val
+            .instruction_locations
+            .map(|i| i.into_iter().collect::<Vec<(usize, InstructionLocation)>>());
+        // Transmute to bytes slice because usize is not encodable.
+        let instruction_locations: Option<
+            Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>,
+        > = unsafe { core::mem::transmute(instruction_locations) };
+        let identifiers = val
+            .identifiers
+            .into_iter()
+            .collect::<Vec<(String, Identifier)>>();
+        (
+            val.data,
+            hints,
+            val.main.map(|v| v as u64),
+            val.start.map(|v| v as u64),
+            val.end.map(|v| v as u64),
+            val.error_message_attributes,
+            instruction_locations,
+            identifiers,
+            val.reference_manager,
+        )
+            .encode()
+    }
+}
+#[cfg(feature = "parity-scale-codec")]
+impl Decode for SharedProgramData {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            Vec<MaybeRelocatable>,
+            Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>,
+            Option<u64>,
+            Option<u64>,
+            Option<u64>,
+            Vec<Attribute>,
+            Option<Vec<([u8; core::mem::size_of::<usize>()], InstructionLocation)>>,
+            Vec<(String, Identifier)>,
+            Vec<HintReference>,
+        )>::decode(input)
+        .unwrap();
+        let hints: Vec<(usize, Vec<HintParams>)> = unsafe {
+            core::mem::transmute(
+                res.1
+                    .into_iter()
+                    .collect::<Vec<([u8; core::mem::size_of::<usize>()], Vec<HintParams>)>>(),
+            )
+        };
+        let hints = <BTreeMap<usize, Vec<HintParams>>>::from_iter(hints.into_iter());
+
+        let instruction_locations: Option<Vec<(usize, InstructionLocation)>> =
+            unsafe { core::mem::transmute(res.6) };
+
+        let instruction_locations: Option<HashMap<usize, InstructionLocation>> =
+            instruction_locations
+                .map(|i| <HashMap<usize, InstructionLocation>>::from_iter(i.into_iter()));
+
+        let identifiers = <HashMap<String, Identifier>>::from_iter(res.7.into_iter());
+        let data = res.0;
+
+        let (hints, hints_ranges) = Program::flatten_hints(&hints, data.len()).unwrap();
+
+        Ok(SharedProgramData {
+            data,
+            hints,
+            hints_ranges,
+            main: res.2.map(|v| v as usize),
+            start: res.3.map(|v| v as usize),
+            end: res.4.map(|v| v as usize),
+            error_message_attributes: res.5,
+            instruction_locations,
+            identifiers,
+            reference_manager: res.8,
+        })
+    }
+}
+
+/// Represents a range of hints corresponding to a PC.
+///
+/// Is [`None`] if the range is empty, and it is [`Some`] tuple `(start, length)` otherwise.
+type HintRange = Option<(usize, NonZeroUsize)>;
+
+#[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Program {
-    pub(crate) shared_program_data: Arc<SharedProgramData>,
-    pub(crate) constants: HashMap<String, Felt252>,
-    pub(crate) builtins: Vec<BuiltinName>,
+    pub shared_program_data: Arc<SharedProgramData>,
+    pub constants: HashMap<String, Felt252>,
+    pub builtins: Vec<BuiltinName>,
+}
+
+#[cfg(feature = "parity-scale-codec")]
+impl Encode for Program {
+    fn encode(&self) -> Vec<u8> {
+        let val = self.clone();
+        let constants = val
+            .constants
+            .into_iter()
+            .collect::<Vec<(String, Felt252)>>();
+        (val.shared_program_data, constants, val.builtins).encode()
+    }
+}
+#[cfg(feature = "parity-scale-codec")]
+impl Decode for Program {
+    fn decode<I: parity_scale_codec::Input>(
+        input: &mut I,
+    ) -> Result<Self, parity_scale_codec::Error> {
+        let res = <(
+            Arc<SharedProgramData>,
+            Vec<(String, Felt252)>,
+            Vec<BuiltinName>,
+        )>::decode(input)
+        .unwrap();
+        let constants = <HashMap<String, Felt252>>::from_iter(res.1.into_iter());
+        Ok(Program {
+            shared_program_data: res.0,
+            constants,
+            builtins: res.2,
+        })
+    }
 }
 
 impl Program {
@@ -83,12 +257,17 @@ impl Program {
                 constants.insert(key.clone(), value);
             }
         }
+        let hints: BTreeMap<_, _> = hints.into_iter().collect();
+
+        let (hints, hints_ranges) = Self::flatten_hints(&hints, data.len())?;
+
         let shared_program_data = SharedProgramData {
             data,
-            hints,
             main,
             start: None,
             end: None,
+            hints,
+            hints_ranges,
             error_message_attributes,
             instruction_locations,
             identifiers,
@@ -101,6 +280,38 @@ impl Program {
         })
     }
 
+    pub(crate) fn flatten_hints(
+        hints: &BTreeMap<usize, Vec<HintParams>>,
+        program_length: usize,
+    ) -> Result<(Vec<HintParams>, Vec<HintRange>), ProgramError> {
+        let bounds = hints
+            .iter()
+            .map(|(pc, hs)| (*pc, hs.len()))
+            .reduce(|(max_hint_pc, full_len), (pc, len)| (max_hint_pc.max(pc), full_len + len));
+
+        let Some((max_hint_pc, full_len)) = bounds else {
+            return Ok((Vec::new(), Vec::new()));
+        };
+
+        if max_hint_pc >= program_length {
+            return Err(ProgramError::InvalidHintPc(max_hint_pc, program_length));
+        }
+
+        let mut hints_values = Vec::with_capacity(full_len);
+        let mut hints_ranges = vec![None; max_hint_pc + 1];
+
+        for (pc, hs) in hints.iter().filter(|(_, hs)| !hs.is_empty()) {
+            let range = (
+                hints_values.len(),
+                NonZeroUsize::new(hs.len()).expect("empty vecs already filtered"),
+            );
+            hints_ranges[*pc] = Some(range);
+            hints_values.extend_from_slice(&hs[..]);
+        }
+
+        Ok((hints_values, hints_ranges))
+    }
+
     #[cfg(feature = "std")]
     pub fn from_file(path: &Path, entrypoint: Option<&str>) -> Result<Program, ProgramError> {
         let file_content = std::fs::read(path)?;
@@ -109,6 +320,11 @@ impl Program {
 
     pub fn from_bytes(bytes: &[u8], entrypoint: Option<&str>) -> Result<Program, ProgramError> {
         deserialize_and_parse_program(bytes, entrypoint)
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let program_json: ProgramJson = parse_program(self.clone());
+        serde_json::to_vec(&program_json).unwrap()
     }
 
     pub fn prime(&self) -> &str {
@@ -147,23 +363,74 @@ impl Program {
         reference_manager
             .references
             .iter()
-            .map(|r| {
-                HintReference {
-                    offset1: r.value_address.offset1.clone(),
-                    offset2: r.value_address.offset2.clone(),
-                    dereference: r.value_address.dereference,
-                    // only store `ap` tracking data if the reference is referred to it
-                    ap_tracking_data: match (&r.value_address.offset1, &r.value_address.offset2) {
-                        (OffsetValue::Reference(Register::AP, _, _), _)
-                        | (_, OffsetValue::Reference(Register::AP, _, _)) => {
-                            Some(r.ap_tracking_data.clone())
-                        }
-                        _ => None,
-                    },
-                    cairo_type: Some(r.value_address.value_type.clone()),
-                }
-            })
+            .map(|r| r.to_owned().into())
             .collect()
+    }
+}
+
+impl Program {
+    pub fn builtins(&self) -> &Vec<BuiltinName> {
+        &self.builtins
+    }
+
+    pub fn data(&self) -> &Vec<MaybeRelocatable> {
+        &self.shared_program_data.data
+    }
+
+    pub fn hints(&self) -> &Vec<HintParams> {
+        &self.shared_program_data.hints
+    }
+
+    pub fn hints_ranges(&self) -> &Vec<HintRange> {
+        &self.shared_program_data.hints_ranges
+    }
+
+    pub fn main(&self) -> &Option<usize> {
+        &self.shared_program_data.main
+    }
+
+    pub fn start(&self) -> &Option<usize> {
+        &self.shared_program_data.start
+    }
+
+    pub fn end(&self) -> &Option<usize> {
+        &self.shared_program_data.end
+    }
+
+    pub fn error_message_attributes(&self) -> &Vec<Attribute> {
+        &self.shared_program_data.error_message_attributes
+    }
+
+    pub fn instruction_locations(&self) -> &Option<HashMap<usize, InstructionLocation>> {
+        &self.shared_program_data.instruction_locations
+    }
+
+    pub fn identifiers(&self) -> &HashMap<String, Identifier> {
+        &self.shared_program_data.identifiers
+    }
+
+    pub fn constants(&self) -> &HashMap<String, Felt252> {
+        &self.constants
+    }
+
+    pub fn reference_manager(&self) -> ReferenceManager {
+        ReferenceManager {
+            references: self
+                .shared_program_data
+                .reference_manager
+                .iter()
+                .map(|r| Reference {
+                    value_address: ValueAddress {
+                        offset1: r.offset1.clone(),
+                        offset2: r.offset2.clone(),
+                        dereference: r.dereference,
+                        value_type: r.cairo_type.clone().unwrap_or_default(),
+                    },
+                    ap_tracking_data: r.ap_tracking_data.clone().unwrap_or_default(),
+                    pc: r.pc,
+                })
+                .collect(),
+        }
     }
 }
 
@@ -185,7 +452,7 @@ impl TryFrom<CasmContractClass> for Program {
         let data = value
             .bytecode
             .iter()
-            .map(|x| MaybeRelocatable::from(Felt252::from(&x.value)))
+            .map(|x| MaybeRelocatable::from(Felt252::from(x.value.clone())))
             .collect();
         //Hint data is going to be hosted processor-side, hints field will only store the pc where hints are located.
         // Only one pc will be stored, so the hint processor will be responsible for executing all hints for a given pc
@@ -235,6 +502,55 @@ mod tests {
     use wasm_bindgen_test::*;
 
     #[test]
+    #[cfg(feature = "parity-scale-codec")]
+    fn test_encode_decode_program() {
+        let program = Program::from_bytes(
+            include_bytes!("../../../cairo_programs/manually_compiled/valid_program_a.json"),
+            Some("main"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            program,
+            Program::decode(&mut &program.encode()[..]).unwrap()
+        )
+    }
+
+    #[test]
+    fn test_serialize_program() {
+        let reference_manager = ReferenceManager {
+            references: Vec::new(),
+        };
+
+        let builtins: Vec<BuiltinName> = Vec::new();
+        let data: Vec<MaybeRelocatable> = vec![
+            mayberelocatable!(5189976364521848832),
+            mayberelocatable!(1000),
+            mayberelocatable!(5189976364521848832),
+            mayberelocatable!(2000),
+            mayberelocatable!(5201798304953696256),
+            mayberelocatable!(2345108766317314046),
+        ];
+
+        let program = Program::new(
+            builtins,
+            data,
+            None,
+            HashMap::new(),
+            reference_manager,
+            HashMap::new(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            program,
+            Program::from_bytes(&program.to_bytes(), None).unwrap()
+        );
+    }
+
+    #[test]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
     fn new() {
         let reference_manager = ReferenceManager {
@@ -267,6 +583,71 @@ mod tests {
         assert_eq!(program.shared_program_data.data, data);
         assert_eq!(program.shared_program_data.main, None);
         assert_eq!(program.shared_program_data.identifiers, HashMap::new());
+        assert_eq!(program.shared_program_data.hints, Vec::new());
+        assert_eq!(program.shared_program_data.hints_ranges, Vec::new());
+    }
+
+    #[test]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn new_program_with_hints() {
+        let reference_manager = ReferenceManager {
+            references: Vec::new(),
+        };
+
+        let builtins: Vec<BuiltinName> = Vec::new();
+        let data: Vec<MaybeRelocatable> = vec![
+            mayberelocatable!(5189976364521848832),
+            mayberelocatable!(1000),
+            mayberelocatable!(5189976364521848832),
+            mayberelocatable!(2000),
+            mayberelocatable!(5201798304953696256),
+            mayberelocatable!(2345108766317314046),
+        ];
+
+        let str_to_hint_param = |s: &str| HintParams {
+            code: s.to_string(),
+            accessible_scopes: vec![],
+            flow_tracking_data: FlowTrackingData {
+                ap_tracking: ApTracking {
+                    group: 0,
+                    offset: 0,
+                },
+                reference_ids: HashMap::new(),
+            },
+        };
+
+        let hints = HashMap::from([
+            (5, vec![str_to_hint_param("c"), str_to_hint_param("d")]),
+            (1, vec![str_to_hint_param("a")]),
+            (4, vec![str_to_hint_param("b")]),
+        ]);
+
+        let program = Program::new(
+            builtins.clone(),
+            data.clone(),
+            None,
+            hints.clone(),
+            reference_manager,
+            HashMap::new(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(program.builtins, builtins);
+        assert_eq!(program.shared_program_data.data, data);
+        assert_eq!(program.shared_program_data.main, None);
+        assert_eq!(program.shared_program_data.identifiers, HashMap::new());
+
+        let program_hints: HashMap<_, _> = program
+            .shared_program_data
+            .hints_ranges
+            .iter()
+            .enumerate()
+            .filter_map(|(pc, r)| r.map(|(s, l)| (pc, (s, s + l.get()))))
+            .map(|(pc, (s, e))| (pc, program.shared_program_data.hints[s..e].to_vec()))
+            .collect();
+        assert_eq!(program_hints, hints);
     }
 
     #[test]
@@ -298,6 +679,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -310,6 +695,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -475,6 +864,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -487,6 +880,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -541,6 +938,10 @@ mod tests {
             Identifier {
                 pc: Some(0),
                 type_: Some(String::from("function")),
+                decorators: None,
+                destination: None,
+                references: None,
+                size: None,
                 value: None,
                 full_name: None,
                 members: None,
@@ -554,6 +955,10 @@ mod tests {
                 pc: None,
                 type_: Some(String::from("const")),
                 value: Some(Felt252::zero()),
+                decorators: None,
+                destination: None,
+                references: None,
+                size: None,
                 full_name: None,
                 members: None,
                 cairo_type: None,
@@ -609,6 +1014,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -621,6 +1030,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -668,6 +1081,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: Some(vec![]),
+                size: None,
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -679,6 +1096,10 @@ mod tests {
                 full_name: Some("__main__.main.Args".to_string()),
                 members: Some(HashMap::new()),
                 cairo_type: None,
+                decorators: None,
+                size: Some(0),
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -690,6 +1111,10 @@ mod tests {
                 full_name: Some("__main__.main.ImplicitArgs".to_string()),
                 members: Some(HashMap::new()),
                 cairo_type: None,
+                decorators: None,
+                size: Some(0),
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -701,6 +1126,10 @@ mod tests {
                 full_name: Some("__main__.main.Return".to_string()),
                 members: Some(HashMap::new()),
                 cairo_type: None,
+                decorators: None,
+                size: Some(0),
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -712,6 +1141,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -745,6 +1178,11 @@ mod tests {
                 },
                 reference_ids: HashMap::new(),
             }),
+            accessible_scopes: vec![
+                "openzeppelin.security.safemath.library".to_string(),
+                "openzeppelin.security.safemath.library.SafeUint256".to_string(),
+                "openzeppelin.security.safemath.library.SafeUint256.add".to_string(),
+            ],
         }];
 
         let data: Vec<MaybeRelocatable> = vec![
@@ -767,6 +1205,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: Some(vec![]),
+                size: None,
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -778,6 +1220,10 @@ mod tests {
                 full_name: Some("__main__.main.Args".to_string()),
                 members: Some(HashMap::new()),
                 cairo_type: None,
+                decorators: None,
+                size: Some(0),
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -789,6 +1235,10 @@ mod tests {
                 full_name: Some("__main__.main.ImplicitArgs".to_string()),
                 members: Some(HashMap::new()),
                 cairo_type: None,
+                decorators: None,
+                size: Some(0),
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -800,6 +1250,10 @@ mod tests {
                 full_name: Some("__main__.main.Return".to_string()),
                 members: Some(HashMap::new()),
                 cairo_type: None,
+                decorators: None,
+                size: Some(0),
+                destination: None,
+                references: None,
             },
         );
         identifiers.insert(
@@ -811,6 +1265,10 @@ mod tests {
                 full_name: None,
                 members: None,
                 cairo_type: None,
+                decorators: None,
+                size: None,
+                destination: None,
+                references: None,
             },
         );
 
@@ -870,7 +1328,8 @@ mod tests {
     fn default_program() {
         let shared_program_data = SharedProgramData {
             data: Vec::new(),
-            hints: HashMap::new(),
+            hints: Vec::new(),
+            hints_ranges: Vec::new(),
             main: None,
             start: None,
             end: None,

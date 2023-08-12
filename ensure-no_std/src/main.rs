@@ -15,7 +15,8 @@ pub extern "C" fn _start() -> ! {
 }
 
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+// NOTE: this should be initialized before use
+static ALLOC: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
 #[allow(unused_imports)]
 use {cairo_felt, cairo_vm};

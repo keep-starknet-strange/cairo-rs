@@ -1,7 +1,6 @@
 use num_integer::Integer;
 
 use super::secp::bigint_utils::BigInt3;
-use super::secp::secp_utils::bigint3_pack;
 use crate::stdlib::{collections::HashMap, prelude::*};
 use crate::{
     hint_processor::hint_processor_definition::HintReference,
@@ -29,9 +28,13 @@ pub fn ec_recover_divmod_n_packed(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let n = bigint3_pack(BigInt3::from_var_name("n", vm, ids_data, ap_tracking)?);
-    let x = bigint3_pack(BigInt3::from_var_name("x", vm, ids_data, ap_tracking)?).mod_floor(&n);
-    let s = bigint3_pack(BigInt3::from_var_name("s", vm, ids_data, ap_tracking)?).mod_floor(&n);
+    let n = BigInt3::from_var_name("n", vm, ids_data, ap_tracking)?.pack86();
+    let x = BigInt3::from_var_name("x", vm, ids_data, ap_tracking)?
+        .pack86()
+        .mod_floor(&n);
+    let s = BigInt3::from_var_name("s", vm, ids_data, ap_tracking)?
+        .pack86()
+        .mod_floor(&n);
 
     let value = div_mod(&x, &s, &n);
     exec_scopes.insert_value("value", value.clone());
@@ -55,8 +58,8 @@ pub fn ec_recover_sub_a_b(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let a = bigint3_pack(BigInt3::from_var_name("a", vm, ids_data, ap_tracking)?);
-    let b = bigint3_pack(BigInt3::from_var_name("b", vm, ids_data, ap_tracking)?);
+    let a = BigInt3::from_var_name("a", vm, ids_data, ap_tracking)?.pack86();
+    let b = BigInt3::from_var_name("b", vm, ids_data, ap_tracking)?.pack86();
 
     let value = a - b;
     exec_scopes.insert_value("value", value.clone());
@@ -83,9 +86,9 @@ pub fn ec_recover_product_mod(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let a = bigint3_pack(BigInt3::from_var_name("a", vm, ids_data, ap_tracking)?);
-    let b = bigint3_pack(BigInt3::from_var_name("b", vm, ids_data, ap_tracking)?);
-    let m = bigint3_pack(BigInt3::from_var_name("m", vm, ids_data, ap_tracking)?);
+    let a = BigInt3::from_var_name("a", vm, ids_data, ap_tracking)?.pack86();
+    let b = BigInt3::from_var_name("b", vm, ids_data, ap_tracking)?.pack86();
+    let m = BigInt3::from_var_name("m", vm, ids_data, ap_tracking)?.pack86();
 
     let product = a * b;
     let value = product.mod_floor(&m);
@@ -118,7 +121,6 @@ mod tests {
     use crate::hint_processor::builtin_hint_processor::hint_code;
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::utils::test_utils::*;
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::vm::vm_core::VirtualMachine;
     use crate::{
         any_box,
@@ -126,7 +128,7 @@ mod tests {
             builtin_hint_processor::builtin_hint_processor_definition::{
                 BuiltinHintProcessor, HintProcessorData,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::exec_scope::ExecutionScopes,
     };

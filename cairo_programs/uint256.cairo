@@ -84,6 +84,16 @@ func main{range_check_ptr: felt}() {
     assert b_quotient_high = Uint256(0, 0);
     assert b_remainder = Uint256(170141183460469231731687303715884105854, 1);
 
+    let (c_quotient_low, c_quotient_high, c_remainder) = uint256_mul_div_mod(
+        Uint256(340281070833283907490476236129005105807, 340282366920938463463374607431768211455),
+        Uint256(2447157533618445569039502, 0),
+        Uint256(0, 1),
+    );
+
+    assert c_quotient_low = Uint256(340282366920938463454053728725133866491, 2447157533618445569039501);
+    assert c_quotient_high = Uint256(0, 0);
+    assert c_remainder = Uint256(326588112914912836985603897252688572242, 0);
+
     let (mult_low_a, mult_high_a) = uint256_mul(Uint256(59, 2), Uint256(10, 0));
     assert mult_low_a = Uint256(590, 20);
     assert mult_high_a = Uint256(0, 0);

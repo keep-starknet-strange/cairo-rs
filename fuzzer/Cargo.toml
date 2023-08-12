@@ -1,0 +1,31 @@
+[package]
+name = "fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+
+[dependencies]
+arbitrary = { version = "1.3.0", features = ["derive"] }
+honggfuzz = "0.5.55"
+libfuzzer-sys = "0.4"
+cairo-vm = { path = "../vm", features = ["arbitrary"] }
+cairo-felt = { path = "../felt", features = ["arbitrary"] }
+
+[[bin]]
+name = "fuzz_json"
+path = "src/fuzz_json.rs"
+
+[[bin]]
+name = "cairo_compiled_programs_fuzzer"
+path = "src/cairo_compiled_programs_fuzzer.rs"
+
+[[bin]]
+name = "fuzz_program"
+path = "src/fuzz_program.rs"

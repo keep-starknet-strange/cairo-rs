@@ -4,7 +4,7 @@ compile:
 	cairo-compile custom_hint.cairo --output custom_hint.json
 
 run: 
-	cargo run
+	cargo run --example custom_hint
 
 clean: 
 	rm custom_hint.json

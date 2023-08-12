@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq)]
+use serde::Serialize;
+
+#[derive(Serialize, Debug, PartialEq)]
 pub(crate) struct DilutedPoolInstanceDef {
     pub(crate) units_per_step: u32,
     pub(crate) spacing: u32,

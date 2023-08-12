@@ -84,17 +84,18 @@ impl KeccakBuiltinRunner {
         let mut input_felts = vec![];
 
         for i in 0..self.n_input_cells as usize {
-            let val = match memory.get(&(first_input_addr + i)?) {
+            let m_index = (first_input_addr + i)?;
+            let val = match memory.get(&m_index) {
                 Some(value) => {
-                    let num = value
-                        .get_int_ref()
-                        .ok_or(RunnerError::BuiltinExpectedInteger(Box::new((
+                    let num = value.get_int_ref().ok_or_else(|| {
+                        RunnerError::BuiltinExpectedInteger(Box::new((
                             KECCAK_BUILTIN_NAME,
-                            (first_input_addr + i)?,
-                        ))))?;
+                            m_index,
+                        )))
+                    })?;
                     if num >= &(Felt252::one() << self.state_rep[i]) {
                         return Err(RunnerError::IntegerBiggerThanPowerOfTwo(Box::new((
-                            (first_input_addr + i)?,
+                            m_index,
                             self.state_rep[i],
                             num.clone(),
                         ))));
@@ -177,8 +178,7 @@ impl KeccakBuiltinRunner {
             self.stop_ptr = Some(stop_ptr);
             Ok(stop_pointer_addr)
         } else {
-            let stop_ptr = self.base;
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(0);
             Ok(pointer)
         }
     }
@@ -239,7 +239,7 @@ mod tests {
     use crate::stdlib::collections::HashMap;
     use crate::types::program::Program;
     use crate::utils::test_utils::*;
-    use crate::vm::runners::cairo_runner::{CairoRunner, RunResources};
+    use crate::vm::runners::cairo_runner::CairoRunner;
 
     use crate::vm::{
         errors::{memory_errors::MemoryError, runner_errors::RunnerError},
@@ -387,12 +387,7 @@ mod tests {
         let address = cairo_runner.initialize(&mut vm).unwrap();
 
         cairo_runner
-            .run_until_pc(
-                address,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor,
-            )
+            .run_until_pc(address, &mut vm, &mut hint_processor)
             .unwrap();
 
         assert_eq!(

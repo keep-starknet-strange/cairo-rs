@@ -168,10 +168,9 @@ mod tests {
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
     use crate::hint_processor::builtin_hint_processor::hint_code;
-    use crate::hint_processor::hint_processor_definition::HintProcessor;
+    use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
     use crate::types::exec_scope::ExecutionScopes;
     use crate::utils::test_utils::*;
-    use crate::vm::runners::cairo_runner::RunResources;
 
     use assert_matches::assert_matches;
 

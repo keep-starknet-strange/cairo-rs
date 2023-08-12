@@ -1,14 +1,12 @@
 use core::str::FromStr;
 
-use crate::stdlib::{boxed::Box, ops::Shl, prelude::*};
+use crate::stdlib::{boxed::Box, prelude::*};
 
 use crate::vm::errors::hint_errors::HintError;
 
 use lazy_static::lazy_static;
 use num_bigint::{BigInt, BigUint};
 use num_traits::Zero;
-
-use super::bigint_utils::Uint384;
 
 // Constants in package "starkware.cairo.common.cairo_secp.constants".
 pub const BASE_86: &str = "starkware.cairo.common.cairo_secp.constants.BASE";
@@ -89,28 +87,13 @@ pub fn bigint3_split(integer: &num_bigint::BigUint) -> Result<[num_bigint::BigUi
     Ok(canonical_repr)
 }
 
-/*
-Takes an UnreducedFelt2523 struct which represents a triple of limbs (d0, d1, d2) of field
-elements and reconstructs the corresponding 256-bit integer (see split()).
-Note that the limbs do not have to be in the range [0, BASE).
-*/
-pub(crate) fn bigint3_pack(num: Uint384) -> num_bigint::BigInt {
-    let limbs = [num.d0, num.d1, num.d2];
-    #[allow(deprecated)]
-    limbs
-        .into_iter()
-        .enumerate()
-        .map(|(idx, value)| value.to_signed_felt().shl(idx * 86))
-        .sum()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stdlib::{borrow::Cow, collections::HashMap, string::ToString};
+    use crate::stdlib::{collections::HashMap, string::ToString};
     use crate::utils::test_utils::*;
     use assert_matches::assert_matches;
-    use felt::{felt_str, Felt252};
+    use felt::Felt252;
     use num_bigint::BigUint;
 
     use num_traits::One;
@@ -182,30 +165,6 @@ mod tests {
                     .to_biguint()
                     .expect("Couldn't convert to BigUint")
 
-        );
-    }
-
-    #[test]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-    fn secp_pack() {
-        let pack_1 = bigint3_pack(Uint384 {
-            d0: Cow::Borrowed(&Felt252::new(10_i32)),
-            d1: Cow::Borrowed(&Felt252::new(10_i32)),
-            d2: Cow::Borrowed(&Felt252::new(10_i32)),
-        });
-        assert_eq!(
-            pack_1,
-            bigint_str!("59863107065073783529622931521771477038469668772249610")
-        );
-
-        let pack_2 = bigint3_pack(Uint384 {
-            d0: Cow::Borrowed(&felt_str!("773712524553362")),
-            d1: Cow::Borrowed(&felt_str!("57408430697461422066401280")),
-            d2: Cow::Borrowed(&felt_str!("1292469707114105")),
-        });
-        assert_eq!(
-            pack_2,
-            bigint_str!("7737125245533626718119526477371252455336267181195264773712524553362")
         );
     }
 }

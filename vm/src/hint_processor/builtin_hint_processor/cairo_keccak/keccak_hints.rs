@@ -56,8 +56,8 @@ pub fn keccak_write_args(
     let low = low.as_ref();
     let high = high.as_ref();
 
-    let low_args = [low & Felt252::new(u64::MAX), low >> 64];
-    let high_args = [high & Felt252::new(u64::MAX), high >> 64];
+    let low_args = [low & Felt252::new(u64::MAX), low >> 64_u32];
+    let high_args = [high & Felt252::new(u64::MAX), high >> 64_u32];
 
     let low_args: Vec<_> = low_args.into_iter().map(MaybeRelocatable::from).collect();
     vm.write_arg(inputs_ptr, &low_args)
@@ -368,7 +368,6 @@ pub fn u64_array_to_mayberelocatable_vec(array: &[u64]) -> Vec<MaybeRelocatable>
 mod tests {
     use super::*;
     use crate::stdlib::string::ToString;
-    use crate::vm::runners::cairo_runner::RunResources;
 
     use crate::{
         any_box,
@@ -376,7 +375,7 @@ mod tests {
             builtin_hint_processor::builtin_hint_processor_definition::{
                 BuiltinHintProcessor, HintProcessorData,
             },
-            hint_processor_definition::{HintProcessor, HintReference},
+            hint_processor_definition::{HintProcessorLogic, HintReference},
         },
         types::{exec_scope::ExecutionScopes, relocatable::Relocatable},
         utils::test_utils::*,

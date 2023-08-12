@@ -4,8 +4,9 @@ use super::{
     pedersen_instance_def::PedersenInstanceDef, poseidon_instance_def::PoseidonInstanceDef,
     range_check_instance_def::RangeCheckInstanceDef,
 };
+use serde::Serialize;
 
-#[derive(Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq)]
 pub(crate) struct BuiltinsInstanceDef {
     pub(crate) output: bool,
     pub(crate) pedersen: Option<PedersenInstanceDef>,

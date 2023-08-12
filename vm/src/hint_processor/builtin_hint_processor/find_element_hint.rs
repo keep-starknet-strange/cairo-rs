@@ -131,7 +131,6 @@ mod tests {
     use super::*;
     use crate::stdlib::string::ToString;
     use crate::types::relocatable::Relocatable;
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         any_box,
         hint_processor::{
@@ -139,7 +138,7 @@ mod tests {
                 builtin_hint_processor_definition::{BuiltinHintProcessor, HintProcessorData},
                 hint_code,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::relocatable::MaybeRelocatable,
         utils::test_utils::*,

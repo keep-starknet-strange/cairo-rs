@@ -1,6 +1,7 @@
 use crate::stdlib::prelude::*;
+use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub(crate) struct KeccakInstanceDef {
     pub(crate) ratio: Option<u32>,
     pub(crate) _state_rep: Vec<u32>,

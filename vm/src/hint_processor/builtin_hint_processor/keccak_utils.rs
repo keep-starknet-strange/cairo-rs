@@ -1,4 +1,4 @@
-use crate::stdlib::{boxed::Box, cmp, collections::HashMap, ops::Shl, prelude::*};
+use crate::stdlib::{boxed::Box, cmp, collections::HashMap, prelude::*};
 
 use crate::types::errors::math_errors::MathError;
 use crate::{
@@ -82,17 +82,12 @@ pub fn unsafe_keccak(
         let word = vm.get_integer(word_addr)?;
         let n_bytes = cmp::min(16, u64_length - byte_i);
 
-        if word.is_negative() || word.as_ref() >= &Felt252::one().shl(8 * (n_bytes as u32)) {
+        if word.is_negative() || word.bits() > 8 * n_bytes {
             return Err(HintError::InvalidWordSize(Box::new(word.into_owned())));
         }
 
-        let mut bytes = word.to_bytes_be();
-        let mut bytes = {
-            let n_word_bytes = &bytes.len();
-            left_pad(&mut bytes, n_bytes as usize - n_word_bytes)
-        };
-
-        keccak_input.append(&mut bytes);
+        let start = 32 - n_bytes as usize;
+        keccak_input.extend_from_slice(&word.to_be_bytes()[start..]);
     }
 
     let mut hasher = Keccak256::new();
@@ -157,12 +152,7 @@ pub fn unsafe_keccak_finalize(
     let range = vm.get_integer_range(start_ptr, n_elems)?;
 
     for word in range.into_iter() {
-        let mut bytes = word.to_bytes_be();
-        let mut bytes = {
-            let n_word_bytes = &bytes.len();
-            left_pad(&mut bytes, 16 - n_word_bytes)
-        };
-        keccak_input.append(&mut bytes);
+        keccak_input.extend_from_slice(&word.to_be_bytes()[16..]);
     }
 
     let mut hasher = Keccak256::new();
@@ -181,13 +171,6 @@ pub fn unsafe_keccak_finalize(
     Ok(())
 }
 
-fn left_pad(bytes_vector: &mut [u8], n_zeros: usize) -> Vec<u8> {
-    let mut res: Vec<u8> = vec![0; n_zeros];
-    res.extend(bytes_vector.iter());
-
-    res
-}
-
 // Implements hints of type : ids.output{num}_low = ids.output{num} & ((1 << 128) - 1)
 // ids.output{num}_high = ids.output{num} >> 128
 pub fn split_output(
@@ -200,7 +183,7 @@ pub fn split_output(
     let output_cow = get_integer_from_var_name(&output_name, vm, ids_data, ap_tracking)?;
     let output = output_cow.as_ref();
     let low = output & Felt252::from(u128::MAX);
-    let high = output >> 128;
+    let high = output >> 128_u32;
     insert_value_from_var_name(
         &format!("output{}_high", num),
         high,
@@ -249,10 +232,9 @@ pub fn split_n_bytes(
 ) -> Result<(), HintError> {
     let n_bytes =
         get_integer_from_var_name("n_bytes", vm, ids_data, ap_tracking).and_then(|x| {
-            x.to_u64()
-                .ok_or(HintError::Math(MathError::Felt252ToU64Conversion(
-                    Box::new(x.into_owned()),
-                )))
+            x.to_u64().ok_or_else(|| {
+                HintError::Math(MathError::Felt252ToU64Conversion(Box::new(x.into_owned())))
+            })
         })?;
     let bytes_in_word = constants
         .get(BYTES_IN_WORD)
@@ -286,8 +268,8 @@ pub fn split_output_mid_low_high(
     let binding = get_integer_from_var_name("output1", vm, ids_data, ap_tracking)?;
     let output1 = binding.as_ref();
     let output1_low = output1 & Felt252::from((1u64 << (8 * 7)) - 1u64);
-    let tmp = output1 >> (8 * 7);
-    let output1_high = &tmp >> 128;
+    let tmp = output1 >> (8_u32 * 7);
+    let output1_high = &tmp >> 128_u32;
     let output1_mid = tmp & &Felt252::from(u128::MAX);
     insert_value_from_var_name("output1_high", output1_high, vm, ids_data, ap_tracking)?;
     insert_value_from_var_name("output1_mid", output1_mid, vm, ids_data, ap_tracking)?;
@@ -298,7 +280,6 @@ pub fn split_output_mid_low_high(
 mod tests {
     use super::*;
     use crate::any_box;
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         hint_processor::{
             builtin_hint_processor::{
@@ -306,7 +287,7 @@ mod tests {
                 hint_code,
                 keccak_utils::HashMap,
             },
-            hint_processor_definition::{HintProcessor, HintReference},
+            hint_processor_definition::{HintProcessorLogic, HintReference},
         },
         types::exec_scope::ExecutionScopes,
         utils::test_utils::*,

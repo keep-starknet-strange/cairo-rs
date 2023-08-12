@@ -1,10 +1,7 @@
 use crate::{
     any_box,
     hint_processor::{
-        builtin_hint_processor::{
-            hint_utils::get_integer_from_var_name,
-            secp::secp_utils::{bigint3_pack, BETA},
-        },
+        builtin_hint_processor::{hint_utils::get_integer_from_var_name, secp::secp_utils::BETA},
         hint_processor_definition::HintReference,
     },
     math_utils::{div_mod, safe_div_bigint},
@@ -38,8 +35,8 @@ pub fn div_mod_n_packed(
     ap_tracking: &ApTracking,
     n: &BigInt,
 ) -> Result<(), HintError> {
-    let a = bigint3_pack(Uint384::from_var_name("a", vm, ids_data, ap_tracking)?);
-    let b = bigint3_pack(Uint384::from_var_name("b", vm, ids_data, ap_tracking)?);
+    let a = Uint384::from_var_name("a", vm, ids_data, ap_tracking)?.pack86();
+    let b = Uint384::from_var_name("b", vm, ids_data, ap_tracking)?.pack86();
 
     let value = div_mod(&a, &b, n);
     exec_scopes.insert_value("a", a);
@@ -118,7 +115,8 @@ pub fn get_point_from_x(
         .ok_or_else(|| HintError::MissingConstant(Box::new(BETA)))?
         .to_bigint();
 
-    let x_cube_int = bigint3_pack(Uint384::from_var_name("x_cube", vm, ids_data, ap_tracking)?)
+    let x_cube_int = Uint384::from_var_name("x_cube", vm, ids_data, ap_tracking)?
+        .pack86()
         .mod_floor(&SECP_P);
     let y_cube_int = (x_cube_int + beta).mod_floor(&SECP_P);
     // Divide by 4
@@ -147,8 +145,12 @@ pub fn pack_modn_div_modn(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let x = bigint3_pack(Uint384::from_var_name("x", vm, ids_data, ap_tracking)?).mod_floor(&N);
-    let s = bigint3_pack(Uint384::from_var_name("s", vm, ids_data, ap_tracking)?).mod_floor(&N);
+    let x = Uint384::from_var_name("x", vm, ids_data, ap_tracking)?
+        .pack86()
+        .mod_floor(&N);
+    let s = Uint384::from_var_name("s", vm, ids_data, ap_tracking)?
+        .pack86()
+        .mod_floor(&N);
 
     let value = div_mod(&x, &s, &N);
     exec_scopes.insert_value("x", x);
@@ -165,7 +167,6 @@ mod tests {
     use crate::stdlib::string::ToString;
     use crate::types::errors::math_errors::MathError;
 
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         any_box,
         hint_processor::{
@@ -173,7 +174,7 @@ mod tests {
                 builtin_hint_processor_definition::{BuiltinHintProcessor, HintProcessorData},
                 hint_code,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::exec_scope::ExecutionScopes,
         utils::test_utils::*,

@@ -1,7 +1,9 @@
+use serde::Serialize;
+
 pub(crate) const CELLS_PER_EC_OP: u32 = 7;
 pub(crate) const INPUT_CELLS_PER_EC_OP: u32 = 5;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub(crate) struct EcOpInstanceDef {
     pub(crate) ratio: Option<u32>,
     pub(crate) scalar_height: u32,

@@ -76,17 +76,18 @@ impl PoseidonBuiltinRunner {
         let first_input_addr = (address - index)?;
         let first_output_addr = (first_input_addr + self.n_input_cells as usize)?;
 
-        let mut input_felts = Vec::<FieldElement>::new();
+        let mut input_felts = vec![];
 
         for i in 0..self.n_input_cells as usize {
-            let val = match memory.get(&(first_input_addr + i)?) {
+            let m_index = (first_input_addr + i)?;
+            let val = match memory.get(&m_index) {
                 Some(value) => {
-                    let num = value
-                        .get_int_ref()
-                        .ok_or(RunnerError::BuiltinExpectedInteger(Box::new((
+                    let num = value.get_int_ref().ok_or_else(|| {
+                        RunnerError::BuiltinExpectedInteger(Box::new((
                             POSEIDON_BUILTIN_NAME,
-                            (first_input_addr + i)?,
-                        ))))?;
+                            m_index,
+                        )))
+                    })?;
                     FieldElement::from_dec_str(&num.to_str_radix(10))
                         .map_err(|_| RunnerError::FailedStringConversion)?
                 }
@@ -157,8 +158,7 @@ impl PoseidonBuiltinRunner {
             self.stop_ptr = Some(stop_ptr);
             Ok(stop_pointer_addr)
         } else {
-            let stop_ptr = self.base;
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(0);
             Ok(pointer)
         }
     }
@@ -172,7 +172,7 @@ mod tests {
     use crate::serde::deserialize_program::BuiltinName;
     use crate::types::program::Program;
     use crate::utils::test_utils::*;
-    use crate::vm::runners::cairo_runner::{CairoRunner, RunResources};
+    use crate::vm::runners::cairo_runner::CairoRunner;
 
     use crate::vm::{runners::builtin_runner::BuiltinRunner, vm_core::VirtualMachine};
     #[cfg(target_arch = "wasm32")]
@@ -340,12 +340,7 @@ mod tests {
         let address = cairo_runner.initialize(&mut vm).unwrap();
 
         cairo_runner
-            .run_until_pc(
-                address,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor,
-            )
+            .run_until_pc(address, &mut vm, &mut hint_processor)
             .unwrap();
 
         assert_eq!(builtin.get_used_cells_and_allocated_size(&vm), Ok((0, 6)));
@@ -389,12 +384,7 @@ mod tests {
         let address = cairo_runner.initialize(&mut vm).unwrap();
 
         cairo_runner
-            .run_until_pc(
-                address,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor,
-            )
+            .run_until_pc(address, &mut vm, &mut hint_processor)
             .unwrap();
 
         assert_eq!(builtin.get_allocated_memory_units(&vm), Ok(6));

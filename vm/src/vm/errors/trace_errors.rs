@@ -1,6 +1,3 @@
-#[cfg(feature = "std")]
-use thiserror::Error;
-#[cfg(not(feature = "std"))]
 use thiserror_no_std::Error;
 
 use crate::vm::errors::memory_errors::MemoryError;

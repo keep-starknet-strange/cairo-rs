@@ -13,7 +13,7 @@ use crate::{
     },
 };
 #[cfg(feature = "cairo-1-hints")]
-use cairo_lang_starknet::casm_contract_class::CasmContractClass;
+use cairo_lang_casm_contract_class::CasmContractClass;
 #[cfg(feature = "cairo-1-hints")]
 use felt::Felt252;
 
@@ -115,7 +115,8 @@ pub(self) fn run_cairo_1_entrypoint(
     expected_retdata: &[Felt252],
 ) {
     let contract_class: CasmContractClass = serde_json::from_slice(program_content).unwrap();
-    let mut hint_processor = Cairo1HintProcessor::new(&contract_class.hints);
+    let mut hint_processor =
+        Cairo1HintProcessor::new(&contract_class.hints, RunResources::default());
 
     let mut runner = CairoRunner::new(
         &(contract_class.clone().try_into().unwrap()),
@@ -190,7 +191,6 @@ pub(self) fn run_cairo_1_entrypoint(
         .run_from_entrypoint(
             entrypoint_offset,
             &entrypoint_args,
-            &mut RunResources::default(),
             true,
             Some(runner.program.shared_program_data.data.len() + program_extra_data.len()),
             &mut vm,
@@ -215,14 +215,11 @@ pub(self) fn run_cairo_1_entrypoint(
 /// Equals to fn run_cairo_1_entrypoint
 /// But with run_resources as an input
 pub(self) fn run_cairo_1_entrypoint_with_run_resources(
-    program_content: &[u8],
+    contract_class: CasmContractClass,
     entrypoint_offset: usize,
-    run_resources: &mut RunResources,
+    hint_processor: &mut Cairo1HintProcessor,
     args: &[MaybeRelocatable],
 ) -> Result<Vec<Felt252>, CairoRunError> {
-    let contract_class: CasmContractClass = serde_json::from_slice(program_content).unwrap();
-    let mut hint_processor = Cairo1HintProcessor::new(&contract_class.hints);
-
     let mut runner = CairoRunner::new(
         &(contract_class.clone().try_into().unwrap()),
         "all_cairo",
@@ -295,11 +292,10 @@ pub(self) fn run_cairo_1_entrypoint_with_run_resources(
     runner.run_from_entrypoint(
         entrypoint_offset,
         &entrypoint_args,
-        run_resources,
         true,
         Some(runner.program.shared_program_data.data.len() + program_extra_data.len()),
         &mut vm,
-        &mut hint_processor,
+        hint_processor,
     )?;
 
     // Check return values

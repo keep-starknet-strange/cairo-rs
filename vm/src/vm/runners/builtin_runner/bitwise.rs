@@ -166,8 +166,7 @@ impl BitwiseBuiltinRunner {
             self.stop_ptr = Some(stop_ptr);
             Ok(stop_pointer_addr)
         } else {
-            let stop_ptr = self.base;
-            self.stop_ptr = Some(stop_ptr);
+            self.stop_ptr = Some(0);
             Ok(pointer)
         }
     }
@@ -189,7 +188,6 @@ mod tests {
     use crate::stdlib::collections::HashMap;
     use crate::vm::errors::memory_errors::MemoryError;
     use crate::vm::runners::builtin_runner::BuiltinRunner;
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::vm::vm_core::VirtualMachine;
     use crate::{
         hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor,
@@ -360,12 +358,7 @@ mod tests {
         let address = cairo_runner.initialize(&mut vm).unwrap();
 
         cairo_runner
-            .run_until_pc(
-                address,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor,
-            )
+            .run_until_pc(address, &mut vm, &mut hint_processor)
             .unwrap();
 
         assert_eq!(builtin.get_used_cells_and_allocated_size(&vm), Ok((0, 5)));
@@ -410,12 +403,7 @@ mod tests {
         let address = cairo_runner.initialize(&mut vm).unwrap();
 
         cairo_runner
-            .run_until_pc(
-                address,
-                &mut RunResources::default(),
-                &mut vm,
-                &mut hint_processor,
-            )
+            .run_until_pc(address, &mut vm, &mut hint_processor)
             .unwrap();
 
         assert_eq!(builtin.get_allocated_memory_units(&vm), Ok(5));

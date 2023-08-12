@@ -1,6 +1,6 @@
 use num_traits::Num;
 
-use crate::tests::*;
+use crate::{tests::*, vm::runners::cairo_runner::ResourceTracker};
 use assert_matches::assert_matches;
 
 #[test]
@@ -28,7 +28,7 @@ fn dict_hint_test() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn test_uint256_div_mod_hint_max_value() {
     let program_data =
-        include_bytes!("../../../cairo_programs/cairo-1-contracts/uint256_div_mod.casm");
+        include_bytes!("../../../cairo_programs/cairo-2-contracts/uint256_div_mod.casm");
 
     run_cairo_1_entrypoint(program_data.as_slice(), 0, &[], &[]);
 }
@@ -37,11 +37,11 @@ fn test_uint256_div_mod_hint_max_value() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn test_uint256_div_mod_hint() {
     let program_data =
-        include_bytes!("../../../cairo_programs/cairo-1-contracts/uint256_div_mod.casm");
+        include_bytes!("../../../cairo_programs/cairo-2-contracts/uint256_div_mod.casm");
 
     run_cairo_1_entrypoint(
         program_data.as_slice(),
-        118,
+        107,
         &[36_usize.into(), 2_usize.into()],
         &[Felt252::from(18_usize)],
     );
@@ -605,51 +605,60 @@ fn uint512_div_mod_test() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn fibonacci_with_run_resources_ok() {
     let program_data = include_bytes!("../../../cairo_programs/cairo-1-contracts/fib.casm");
-    let mut resources = RunResources::new(621);
+    let contract_class: CasmContractClass = serde_json::from_slice(program_data).unwrap();
     // Program takes 621 steps
+    let mut hint_processor =
+        Cairo1HintProcessor::new(&contract_class.hints, RunResources::new(621));
     assert_matches!(
         run_cairo_1_entrypoint_with_run_resources(
-            program_data.as_slice(),
+            serde_json::from_slice(program_data.as_slice()).unwrap(),
             0,
-            &mut resources,
+            &mut hint_processor,
             &[1_usize.into(), 1_usize.into(), 20_usize.into()],
         ),
         Ok(x) if x == [10946_usize.into()]
     );
 
-    assert_eq!(resources, RunResources::new(0));
+    assert_eq!(hint_processor.run_resources(), &RunResources::new(0));
 }
 
 #[test]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn fibonacci_with_run_resources_2_ok() {
     let program_data = include_bytes!("../../../cairo_programs/cairo-1-contracts/fib.casm");
-    let mut resources = RunResources::new(1000);
+    let contract_class: CasmContractClass = serde_json::from_slice(program_data).unwrap();
     // Program takes 621 steps
+    let mut hint_processor =
+        Cairo1HintProcessor::new(&contract_class.hints, RunResources::new(1000));
     assert_matches!(
         run_cairo_1_entrypoint_with_run_resources(
-            program_data.as_slice(),
+            contract_class,
             0,
-            &mut resources,
+            &mut hint_processor,
             &[1_usize.into(), 1_usize.into(), 20_usize.into()],
         ),
         Ok(x) if x == [10946_usize.into()]
     );
-    assert_eq!(resources, RunResources::new(1000 - 621));
+    assert_eq!(
+        hint_processor.run_resources(),
+        &RunResources::new(1000 - 621)
+    );
 }
 
 #[test]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn fibonacci_with_run_resources_error() {
     let program_data = include_bytes!("../../../cairo_programs/cairo-1-contracts/fib.casm");
-    let mut resources = RunResources::new(100);
+    let contract_class: CasmContractClass = serde_json::from_slice(program_data).unwrap();
     // Program takes 621 steps
+    let mut hint_processor =
+        Cairo1HintProcessor::new(&contract_class.hints, RunResources::new(100));
     assert!(run_cairo_1_entrypoint_with_run_resources(
-        program_data.as_slice(),
+        contract_class,
         0,
-        &mut resources,
+        &mut hint_processor,
         &[1_usize.into(), 1_usize.into(), 20_usize.into()],
     )
     .is_err());
-    assert_eq!(resources, RunResources::new(0));
+    assert_eq!(hint_processor.run_resources(), &RunResources::new(0));
 }

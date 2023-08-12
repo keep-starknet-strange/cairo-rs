@@ -546,14 +546,13 @@ mod tests {
     use crate::hint_processor::builtin_hint_processor::secp::secp_utils::SECP_P_V2;
     use crate::stdlib::string::ToString;
 
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         any_box,
         hint_processor::{
             builtin_hint_processor::builtin_hint_processor_definition::{
                 BuiltinHintProcessor, HintProcessorData,
             },
-            hint_processor_definition::HintProcessor,
+            hint_processor_definition::HintProcessorLogic,
         },
         types::{exec_scope::ExecutionScopes, relocatable::Relocatable},
         utils::test_utils::*,

@@ -5,8 +5,10 @@ use super::instance_definitions::{
     diluted_pool_instance_def::DilutedPoolInstanceDef,
 };
 
-#[derive(Debug)]
-pub(crate) struct CairoLayout {
+use serde::Serialize;
+
+#[derive(Serialize, Debug)]
+pub struct CairoLayout {
     pub(crate) _name: String,
     pub(crate) _cpu_component_step: u32,
     pub(crate) rc_units: u32,

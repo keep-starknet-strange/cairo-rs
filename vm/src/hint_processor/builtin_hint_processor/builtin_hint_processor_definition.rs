@@ -21,10 +21,13 @@ use super::{
     },
 };
 use crate::{
-    hint_processor::builtin_hint_processor::secp::ec_utils::{
-        ec_double_assign_new_x, ec_double_assign_new_x_v2,
+    hint_processor::{
+        builtin_hint_processor::secp::ec_utils::{
+            ec_double_assign_new_x, ec_double_assign_new_x_v2,
+        },
+        hint_processor_definition::HintProcessorLogic,
     },
-    vm::runners::cairo_runner::RunResources,
+    vm::runners::cairo_runner::{ResourceTracker, RunResources},
 };
 use crate::{
     hint_processor::{
@@ -51,10 +54,8 @@ use crate::{
                 unsafe_keccak_finalize,
             },
             math_utils::*,
-            memcpy_hint_utils::{
-                add_segment, enter_scope, exit_scope, memcpy_continue_copying, memcpy_enter_scope,
-            },
-            memset_utils::{memset_continue_loop, memset_enter_scope},
+            memcpy_hint_utils::{add_segment, enter_scope, exit_scope, memcpy_enter_scope},
+            memset_utils::{memset_enter_scope, memset_step_loop},
             poseidon_utils::{n_greater_than_10, n_greater_than_2},
             pow_utils::pow,
             secp::{
@@ -103,7 +104,7 @@ use crate::{
                 verify_multiplicity_body, verify_usort,
             },
         },
-        hint_processor_definition::{HintProcessor, HintReference},
+        hint_processor_definition::HintReference,
     },
     serde::deserialize_program::ApTracking,
     stdlib::{any::Any, collections::HashMap, prelude::*, rc::Rc},
@@ -148,16 +149,21 @@ pub struct HintFunc(
 );
 pub struct BuiltinHintProcessor {
     pub extra_hints: HashMap<String, Rc<HintFunc>>,
+    run_resources: RunResources,
 }
 impl BuiltinHintProcessor {
     pub fn new_empty() -> Self {
         BuiltinHintProcessor {
             extra_hints: HashMap::new(),
+            run_resources: RunResources::default(),
         }
     }
 
-    pub fn new(extra_hints: HashMap<String, Rc<HintFunc>>) -> Self {
-        BuiltinHintProcessor { extra_hints }
+    pub fn new(extra_hints: HashMap<String, Rc<HintFunc>>, run_resources: RunResources) -> Self {
+        BuiltinHintProcessor {
+            extra_hints,
+            run_resources,
+        }
     }
 
     pub fn add_hint(&mut self, hint_code: String, hint_func: Rc<HintFunc>) {
@@ -165,14 +171,13 @@ impl BuiltinHintProcessor {
     }
 }
 
-impl HintProcessor for BuiltinHintProcessor {
+impl HintProcessorLogic for BuiltinHintProcessor {
     fn execute_hint(
         &mut self,
         vm: &mut VirtualMachine,
         exec_scopes: &mut ExecutionScopes,
         hint_data: &Box<dyn Any>,
         constants: &HashMap<String, Felt252>,
-        _run_resources: &mut RunResources,
     ) -> Result<(), HintError> {
         let hint_data = hint_data
             .downcast_ref::<HintProcessorData>()
@@ -234,15 +239,20 @@ impl HintProcessor for BuiltinHintProcessor {
             hint_code::MEMSET_ENTER_SCOPE => {
                 memset_enter_scope(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
-            hint_code::MEMCPY_CONTINUE_COPYING => memcpy_continue_copying(
+            hint_code::MEMCPY_CONTINUE_COPYING => memset_step_loop(
                 vm,
                 exec_scopes,
                 &hint_data.ids_data,
                 &hint_data.ap_tracking,
+                "continue_copying",
             ),
-            hint_code::MEMSET_CONTINUE_LOOP => {
-                memset_continue_loop(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
-            }
+            hint_code::MEMSET_CONTINUE_LOOP => memset_step_loop(
+                vm,
+                exec_scopes,
+                &hint_data.ids_data,
+                &hint_data.ap_tracking,
+                "continue_loop",
+            ),
             hint_code::SPLIT_FELT => split_felt(vm, &hint_data.ids_data, &hint_data.ap_tracking),
             hint_code::UNSIGNED_DIV_REM => {
                 unsigned_div_rem(vm, &hint_data.ids_data, &hint_data.ap_tracking)
@@ -805,16 +815,32 @@ impl HintProcessor for BuiltinHintProcessor {
     }
 }
 
+impl ResourceTracker for BuiltinHintProcessor {
+    fn consume_step(&mut self) {
+        self.run_resources.consume_step();
+    }
+
+    fn consumed(&self) -> bool {
+        self.run_resources.consumed()
+    }
+
+    fn get_n_steps(&self) -> Option<usize> {
+        self.run_resources.get_n_steps()
+    }
+
+    fn run_resources(&self) -> &RunResources {
+        &self.run_resources
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::stdlib::any::Any;
     use crate::types::relocatable::Relocatable;
 
-    use crate::vm::runners::cairo_runner::RunResources;
     use crate::{
         any_box,
-        hint_processor::hint_processor_definition::HintProcessor,
         types::{exec_scope::ExecutionScopes, relocatable::MaybeRelocatable},
         utils::test_utils::*,
         vm::{
@@ -1228,7 +1254,6 @@ mod tests {
                 exec_scopes,
                 &any_box!(hint_data),
                 &HashMap::new(),
-                &mut RunResources::default(),
             ),
             Ok(())
         );
@@ -1241,7 +1266,6 @@ mod tests {
                 exec_scopes,
                 &any_box!(hint_data),
                 &HashMap::new(),
-                &mut RunResources::default(),
             ),
             Ok(())
         );

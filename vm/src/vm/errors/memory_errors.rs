@@ -3,9 +3,6 @@
 
 use crate::stdlib::prelude::*;
 
-#[cfg(feature = "std")]
-use thiserror::Error;
-#[cfg(not(feature = "std"))]
 use thiserror_no_std::Error;
 
 use felt::Felt252;
@@ -99,6 +96,8 @@ pub enum MemoryError {
     InvalidUsedSizeSegmentArena,
     #[error("Vector capacity exceeded")]
     VecCapacityExceeded,
+    #[error("Memory wasn't relocated")]
+    UnrelocatedMemory,
 }
 
 #[derive(Debug, PartialEq, Eq, Error)]

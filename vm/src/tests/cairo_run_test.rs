@@ -335,7 +335,7 @@ fn dict_update() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn uint256() {
     let program_data = include_bytes!("../../../cairo_programs/uint256.json");
-    run_program_simple_with_memory_holes(program_data.as_slice(), 3534);
+    run_program_simple_with_memory_holes(program_data.as_slice(), 3554);
 }
 
 #[test]
@@ -974,4 +974,21 @@ fn cairo_run_reduce() {
 fn cairo_run_if_reloc_equal() {
     let program_data = include_bytes!("../../../cairo_programs/if_reloc_equal.json");
     run_program_simple_with_memory_holes(program_data, 4);
+}
+
+#[test]
+fn cairo_run_overflowing_dict() {
+    let program_data =
+        include_bytes!("../../../cairo_programs/manually_compiled/overflowing_dict.json");
+    run_program_with_error(program_data, "Unknown memory cell at address");
+}
+
+#[test]
+fn cairo_run_big_hint_pcs() {
+    let program_data =
+        include_bytes!("../../../cairo_programs/manually_compiled/invalid_hint_pc.json");
+    run_program_with_error(
+        program_data,
+        "Hint PC (18446744073709551615) is greater or equal to program length (0)",
+    );
 }

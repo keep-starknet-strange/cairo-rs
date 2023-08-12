@@ -31,6 +31,7 @@ pub mod without_std {
     pub use alloc::vec;
 
     pub mod collections {
+        pub use alloc::collections::BTreeMap;
         pub use hashbrown::{HashMap, HashSet};
     }
 

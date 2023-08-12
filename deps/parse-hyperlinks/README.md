@@ -24,4 +24,3 @@ To illustrate the usage and the
 [Parse-hyperlinks](https://crates.io/crates/parse-hyperlinks) comes with a
 simple command line application:
 [Atext2html](https://crates.io/crates/atext2html)
-

@@ -4,47 +4,58 @@ members = [
     "felt",
     "vm",
     "hint_accountant",
-    "./deps/parse-hyperlinks",
+    "examples/wasm-demo",
 ]
 exclude = ["ensure-no_std"]
 
+# Explicitly set the resolver to the default for edition >= 2021
+# https://doc.rust-lang.org/edition-guide/rust-2021/default-cargo-resolver.html
+resolver = "2"
+
+[workspace.package]
+version = "0.8.5"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/lambdaclass/cairo-vm/"
+readme = "README.md"
+keywords = ["starknet", "cairo", "vm", "wasm", "no_std"]
+
 [workspace.dependencies]
-mimalloc = { version = "0.1.29", default-features = false }
+felt = { package = "cairo-felt", path = "./felt", version = "0.8.5", default-features = false, features = [
+    "alloc",
+] }
+cairo-vm = { path = "./vm", version = "0.8.5", default-features = false }
+mimalloc = { version = "0.1.37", default-features = false }
 num-bigint = { version = "0.4", default-features = false, features = [
     "serde",
     "rand",
 ] }
-rand = { version = "0.8.3", features = ["small_rng"], default-features = false }
+rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
 num-traits = { version = "0.2", default-features = false }
 num-integer = { version = "0.1.45", default-features = false }
 serde = { version = "1.0", features = ["derive"], default-features = false }
-serde_bytes = { version = "0.11.9", default-features = false, features = [
-    "alloc",
-] }
 serde_json = { version = "1.0", features = [
     "arbitrary_precision",
     "alloc",
 ], default-features = false }
 hex = { version = "0.4.3", default-features = false }
-bincode = { version = "2.0.0-rc.2", tag = "v2.0.0-rc.2", git = "https://github.com/bincode-org/bincode.git", default-features = false, features = [
+bincode = { version = "2.0.0-rc.3", tag = "v2.0.0-rc.3", git = "https://github.com/bincode-org/bincode.git", default-features = false, features = [
     "serde",
 ] }
 starknet-crypto = { version = "0.5.0", default-features = false, features = [
     "signature-display",
     "alloc",
 ] }
-sha3 = { version = "0.10.1", default-features = false }
-rand_core = { version = "0.6.4", default-features = false }
+sha3 = { version = "0.10.8", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false, features = [
     "spin_no_std",
 ] }
 nom = { version = "7", default-features = false }
-sha2 = { version = "0.10.2", features = ["compress"], default-features = false }
-generic-array = { version = "0.14.6", default-features = false }
+sha2 = { version = "0.10.7", features = ["compress"], default-features = false }
+generic-array = { version = "0.14.7", default-features = false }
 keccak = { version = "0.1.2", default-features = false }
-hashbrown = { version = "0.13.2", features = ["serde"] }
+hashbrown = { version = "0.14.0", features = ["serde"] }
 anyhow = { version = "1.0.69", default-features = false }
-thiserror = { version = "1.0.32", default-features = false }
 thiserror-no-std = { version = "2.0.2", default-features = false }
 
 # This crate has only one function `take_until_unbalanced` that is
@@ -55,18 +66,27 @@ thiserror-no-std = { version = "2.0.2", default-features = false }
 parse-hyperlinks = { package = "cairo-take_until_unbalanced", path = "./deps/parse-hyperlinks", version = "0.29.0", default-features = false, features = [
     "alloc",
 ] }
-felt = { package = "cairo-felt", path = "./felt", version = "0.6.0", default-features = false, features = [
-    "alloc",
-] }
+
 bitvec = { version = "1", default-features = false, features = ["alloc"] }
 
+parity-scale-codec = { version = "3.6.0", default-features = false }
+
 # Dependencies for cairo-1-hints feature
-cairo-lang-starknet = { version = "1.1.0", default-features = false }
-cairo-lang-casm = { version = "1.1.0", default-features = false }
+cairo-lang-casm = { git = "https://github.com/keep-starknet-strange/cairo", branch = "no_std-support-8bbf530", default-features = false }
+cairo-lang-casm-contract-class = { git = "https://github.com/keep-starknet-strange/cairo", branch = "no_std-support-8bbf530", default-features = false }
 
 # TODO: check these dependencies for wasm compatibility
-ark-ff = { version = "0.4.0-alpha.7", default-features = false }
-ark-std = { version = "0.3.0", default-features = false }
+ark-ff = { version = "0.4.2", default-features = false }
+ark-std = { version = "0.4.0", default-features = false }
+
+# For fuzzing
+arbitrary = { version = "1.3.0", features = ["derive"] }
+
+pretty_assertions = "1.3.0"
 
 [profile.release]
 lto = "fat"
+
+[profile.release.package.wasm-demo]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

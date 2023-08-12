@@ -3,14 +3,11 @@
 use cairo_vm::{
     hint_processor::{
         builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor,
-        hint_processor_definition::HintProcessor,
+        hint_processor_definition::HintProcessorLogic,
     },
     serde::deserialize_program::ApTracking,
     types::exec_scope::ExecutionScopes,
-    vm::{
-        errors::hint_errors::HintError, runners::cairo_runner::RunResources,
-        vm_core::VirtualMachine,
-    },
+    vm::{errors::hint_errors::HintError, vm_core::VirtualMachine},
     with_std::collections::{HashMap, HashSet},
 };
 use serde::Deserialize;
@@ -70,13 +67,7 @@ fn run() {
                 .compile_hint(h, &ap_tracking_data, &reference_ids, &references)
                 .expect("this implementation is infallible");
             matches!(
-                hint_executor.execute_hint(
-                    &mut vm,
-                    &mut exec_scopes,
-                    &hint_data,
-                    &constants,
-                    &mut RunResources::default()
-                ),
+                hint_executor.execute_hint(&mut vm, &mut exec_scopes, &hint_data, &constants,),
                 Err(HintError::UnknownHint(_)),
             )
         })

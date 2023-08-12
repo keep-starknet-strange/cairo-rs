@@ -1,4 +1,4 @@
-name: Test dependencies and cairo-rs install
+name: Test dependencies and cairo-vm install
 
 on:
   merge_group:
@@ -17,22 +17,68 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - if: matrix.os == 'ubuntu-22.04'
-        name: "Install on ubuntu-22.04"
-        run: install-scripts/install-ubuntu.sh
+      - name: Set up Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-all-crates: 'true'
+          cache-on-failure: 'true'
+          cache-directories: ./cairo/target/
 
-      - if: matrix.os == 'macos-12'
-        name: "Install on macos-12"
-        run: install-scripts/install-macos.sh
+      # just to cache dependencies
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      # NOTE: we do it in one step because GitHub cleans the PATH between steps
+      - name: Install dependencies and compile project
+        run: |
+          source install.sh
+          make check
 
   install_debian:
     name: "Install on debian-11"
     runs-on: ubuntu-22.04
     container:
       image: debian:11
+    defaults:
+      run:
+        shell: bash {0}
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: "Install on debian-11"
-        run: install-scripts/install-debian.sh
+      # we don't use swatinem because rustc isn't installed yet
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/
+            ./target/
+            ./cairo/target/
+          key: ${{ runner.os }}-install-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-install-
+
+      - name: Enable pip cache
+        run: |
+          mkdir -p ~/.cache/pip
+          chown -v -R $USER ~/.cache
+          chmod -v -R 770 ~/.cache
+          ls -al ~/
+          ls -al ~/.cache
+
+      # NOTE: we don't use install-python because lsb_release isn't installed
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip/wheels
+          key: ${{ runner.os }}-python-install-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-python-install-
+
+      # NOTE: we do it in one step because GitHub cleans the PATH between steps
+      - name: Install dependencies and compile project
+        run: |
+          source install.sh
+          make check

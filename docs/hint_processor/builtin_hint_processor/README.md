@@ -3,20 +3,20 @@ How to run a cairo program with custom hints
 
 ### Step by Step Guide:
 
-#### Step 1: Add cairo-rs to your project as a crate
-Add cairo-rs as a dependency to your Cargo.toml
+#### Step 1: Add cairo-vm to your project as a crate
+Add cairo-vm as a dependency to your Cargo.toml
 
 By using either path:
 
 ```rust
 [dependencies]
-cairo-rs =  {path = "[path to cairo-rs directory"}
+cairo-vm =  {path = "[path to cairo-vm directory"}
 ```
 
 Or by github link:
 ```rust
 [dependencies]
-cairo-rs =  {git = "https://github.com/lambdaclass/cairo-rs.git"}
+cairo-vm =  {git = "https://github.com/lambdaclass/cairo-vm.git"}
 ```
 
 #### Step 2: Code the implementation of your custom hint (Using the helpers and structures described in the sections below)
@@ -58,7 +58,7 @@ let hint = HintFunc(Box::new(print_a_hint));
 ```
 
 #### Step 3: Instantiate the BuiltinHintProcessor and add your custom hint implementation
-Import the BuiltinHintProcessor from cairo-rs, instantiate it using the `new_empty()` method and the add your custom hint implementation using the method `add_hint`
+Import the BuiltinHintProcessor from cairo-vm, instantiate it using the `new_empty()` method and the add your custom hint implementation using the method `add_hint`
 ```rust
 use cairo_vm::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor
 
@@ -68,7 +68,7 @@ hint_processor.add_hint(String::from("print(ids.a)"), hint);
 You can also create a dictionary of HintFunc and use the method `new()` to create a BuiltinHintProcessor with a preset dictionary of functions instead of using `add_hint()` for each custom hint.
 
 #### Step 4: Run your cairo program using BuiltinHintProcessor extended with your hint
-Import the function cairo_run from cairo-rs, and run your compiled program
+Import the function cairo_run from cairo-vm, and run your compiled program
 
 ```rust
 use cairo_vm::cairo_run::cairo_run;

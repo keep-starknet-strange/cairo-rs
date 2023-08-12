@@ -1,0 +1,76 @@
+name: "Fuzzer Workflow"
+on:
+  schedule:
+  # At the end of every day
+  - cron: "0 0 * * *"
+jobs:
+  run-fuzzers:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+
+
+    - name: Cache Inputs
+      id: cache-inputs
+      uses: actions/cache@v3
+      with:
+      # Path where the inputs for the fuzzer are stored
+        path: fuzzer/hfuzz_workspace/fuzz_json/input
+        key: ${{ runner.os }}-inputs
+
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+        sudo apt-get install binutils-dev
+        sudo apt-get install libunwind-dev
+        sudo curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain nightly
+
+    - name: Set Environment Variable
+      run: echo "PATH="/root/.cargo/bin:${PATH}"" >> $GITHUB_ENV
+
+    - name: Install Honggfuzz
+      run: cargo install honggfuzz
+
+    # If has cached inputs starts with them or else starts from 0
+    - name: Initializing fuzzer with previous inputs 
+      run: |
+        cd fuzzer
+        HFUZZ_RUN_ARGS="--dict=json.dict --run_time 10800 --timeout 60 -T" cargo hfuzz run fuzz_json
+
+    # run the fuzzer with minimize to reduce inputs 
+    - name: Initializing fuzzer with minimize
+      run: |
+        cd fuzzer
+        HFUZZ_RUN_ARGS="--dict=json.dict --minimize --timeout 60 -T" cargo hfuzz run fuzz_json
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: changing report
+        file_pattern: '*/hfuzz_workspace/fuzzer/fuzz_json/HONGGFUZZ*  */hfuzz_workspace/fuzzer/fuzz_json/*.fuzz'
+
+    # Checkout current and last commit for the diff
+    - name: Checkout commits  
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+
+    # Check if any new crashes were added
+    - name: Check diff
+      id: check_file_changed
+      run:  echo "report=$(git diff --name-only HEAD^ HEAD -- fuzzer/hfuzz_workspace/fuzz_json/*.fuzz)" >> $GITHUB_OUTPUT 
+
+    # If a new crash was found, create an issue
+    - name: Create issue 
+      uses: JasonEtco/create-an-issue@v2
+      if: ${{ steps.check_file_changed.outputs.report != '' }} 
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CRASH_REPORT: ${{ steps.check_file_changed.outputs.report }}
+      with:
+        filename: .github/ISSUE_TEMPLATE/crash_report.md
