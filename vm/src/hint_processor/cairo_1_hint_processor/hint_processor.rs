@@ -726,6 +726,7 @@ impl Cairo1HintProcessor {
             .map_err(HintError::from)
     }
 
+    #[cfg(feature = "std")]
     #[allow(unused_variables)]
     fn debug_print(
         &self,
