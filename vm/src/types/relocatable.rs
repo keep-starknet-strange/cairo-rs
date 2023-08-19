@@ -29,6 +29,10 @@ impl Encode for Relocatable {
         (self.segment_index as i64, self.offset as u64).encode()
     }
 }
+
+#[cfg(feature = "parity-scale-codec")]
+impl parity_scale_codec::EncodeLike for Relocatable {}
+
 #[cfg(feature = "parity-scale-codec")]
 impl Decode for Relocatable {
     fn decode<I: parity_scale_codec::Input>(
