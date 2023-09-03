@@ -120,7 +120,7 @@ impl Encode for SharedProgramData {
             .identifiers
             .iter()
             .map(|(s, i)| (s.clone(), i.clone()))
-            .collect::<Vec<(String, Identifier)>>();
+            .collect::<BTreeMap<String, Identifier>>();
 
         parity_scale_codec::Encode::encode_to(&self.data, dest);
         parity_scale_codec::Encode::encode_to(&hints, dest);
@@ -177,7 +177,7 @@ impl Decode for SharedProgramData {
                     .collect::<HashMap<_, _>>()
             });
 
-        let identifiers = <Vec<(String, Identifier)> as Decode>::decode(input)
+        let identifiers = <BTreeMap<String, Identifier> as Decode>::decode(input)
             .map_err(|e| e.chain("Could not decode `SharedProgramData::identifiers`"))?
             .into_iter()
             .collect::<HashMap<String, Identifier>>();
@@ -220,7 +220,7 @@ impl Encode for Program {
             .constants
             .iter()
             .map(|(s, f)| (s.clone(), f.clone()))
-            .collect::<Vec<(String, Felt252)>>();
+            .collect::<BTreeMap<String, Felt252>>();
 
         parity_scale_codec::Encode::encode_to(&self.shared_program_data, dest);
         parity_scale_codec::Encode::encode_to(&constants, dest);
@@ -238,7 +238,7 @@ impl Decode for Program {
     ) -> Result<Self, parity_scale_codec::Error> {
         let shared_program_data = <Arc<SharedProgramData> as Decode>::decode(input)
             .map_err(|e| e.chain("Could not decode `Program::shared_program_data`"))?;
-        let constants = <Vec<(String, Felt252)> as Decode>::decode(input)
+        let constants = <BTreeMap<String, Felt252> as Decode>::decode(input)
             .map_err(|e| e.chain("Could not decode `Program::constants`"))?
             .into_iter()
             .collect::<HashMap<_, _>>();
