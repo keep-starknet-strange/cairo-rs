@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1687105848846,
-  "repoUrl": "https://github.com/lambdaclass/cairo-rs",
+  "lastUpdate": 1698238595533,
+  "repoUrl": "https://github.com/keep-starknet-strange/cairo-rs",
   "entries": {
     "Benchmark": [
       {
@@ -107116,6 +107116,96 @@ window.BENCHMARK_DATA = {
             "name": "parse program",
             "value": 24223958,
             "range": "± 1814132",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fontana.pedro93@gmail.com",
+            "name": "Pedro Fontana",
+            "username": "pefontana"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e6171d66a64146acc16d5512766ae91ae044f297",
+          "message": "Serialize and deserialize program (#1458)\n\n* make `ProgramJson` serializable\n\n* refactor: impl `From` `Program` for `ProgramJson`\n\n* Restore lockfile\n\n* rfc: implement From to convert HintsCollection to BTreeMap\n\n* add dummy test\n\n* Fix ProgramJson::from(Program)\n\n* Add integration test\n\n* User &Program\n\n* Implement ProgramDeserializer\n\n* add integration test\n\n* Add error handling\n\n* Restore Cargo.lock\n\n* update CHANGELOG.md\n\n* rename variables\n\n* Add doc\n\n* Add doc\n\n* typo\n\n* Update CHANGELOG.md\n\nCo-authored-by: Mario Rugiero <mario.rugiero@lambdaclass.com>\n\n* Remove unnecesary code\n\n* update CHANGELOG.md\n\n* Remove ProgramJson Serialize\n\n---------\n\nCo-authored-by: Kariy <ammr.arf@gmail.com>\nCo-authored-by: Mario Rugiero <mrugiero@gmail.com>\nCo-authored-by: Mario Rugiero <mario.rugiero@lambdaclass.com>",
+          "timestamp": "2023-10-24T21:56:21Z",
+          "tree_id": "08c773668ee0688820b2a6ba6f74dc615dc09298",
+          "url": "https://github.com/keep-starknet-strange/cairo-rs/commit/e6171d66a64146acc16d5512766ae91ae044f297"
+        },
+        "date": 1698238588258,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "add_u64_with_felt/1",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/2",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/3",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/4",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/5",
+            "value": 1,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/6",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/7",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "add_u64_with_felt/8",
+            "value": 2,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "build runner",
+            "value": 1772,
+            "range": "± 70",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "initialize",
+            "value": 60928,
+            "range": "± 1957",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "parse program",
+            "value": 24053788,
+            "range": "± 947808",
             "unit": "ns/iter"
           }
         ]
