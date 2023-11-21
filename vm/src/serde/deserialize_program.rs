@@ -6,12 +6,10 @@
 //! To generate a [`Program`] from a JSON string, see [`Program::from_bytes()`].
 //! To do the same from a JSON file, see [`Program::from_file()`].
 
-use crate::stdlib::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-    prelude::*,
-    sync::Arc,
-};
+extern crate alloc;
+pub use alloc::collections::btree_map::BTreeMap;
+
+use crate::stdlib::{collections::HashMap, fmt, prelude::*, sync::Arc};
 
 use super::serialize_program::serialize_value_address;
 use crate::vm::runners::builtin_runner::SEGMENT_ARENA_BUILTIN_NAME;
@@ -115,7 +113,7 @@ impl Encode for FlowTrackingData {
             .reference_ids
             .iter()
             .map(|(s, v)| (s.clone(), *v as u64))
-            .collect::<Vec<_>>();
+            .collect::<BTreeMap<String, u64>>();
 
         parity_scale_codec::Encode::encode_to(&self.ap_tracking, dest);
         parity_scale_codec::Encode::encode_to(&reference_ids, dest);
@@ -133,7 +131,7 @@ impl Decode for FlowTrackingData {
         let ap_tracking = <ApTracking as Decode>::decode(input)
             .map_err(|e| e.chain("Could not decode `FlowTrackingData::ap_tracking`"))?;
 
-        let reference_ids = <Vec<(String, u64)> as Decode>::decode(input)
+        let reference_ids = <BTreeMap<String, u64> as Decode>::decode(input)
             .map_err(|e| e.chain("Could not decode `FlowTrackingData::reference_ids`"))?
             .into_iter()
             .map(|(s, v)| (s, v as usize))
@@ -236,7 +234,8 @@ pub struct Identifier {
 impl Encode for Identifier {
     fn encode(&self) -> Vec<u8> {
         let val = self.clone();
-        let members: Option<Vec<(String, Member)>> = val.members.map(|m| m.into_iter().collect());
+        let members: Option<BTreeMap<String, Member>> =
+            val.members.map(|m| m.into_iter().collect());
         (
             val.pc.map(|v| v as u64),
             val.type_,
@@ -266,7 +265,7 @@ impl Decode for Identifier {
             Option<String>,
             Option<Felt252>,
             Option<String>,
-            Option<Vec<(String, Member)>>,
+            Option<BTreeMap<String, Member>>,
             Option<String>,
             Option<Vec<String>>,
             Option<u64>,

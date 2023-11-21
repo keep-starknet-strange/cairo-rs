@@ -1,3 +1,6 @@
+extern crate alloc;
+pub use alloc::collections::btree_map::BTreeMap;
+
 use crate::{
     air_public_input::{PublicInput, PublicInputError},
     stdlib::{
@@ -45,6 +48,7 @@ use crate::{
         },
     },
 };
+
 use felt::Felt252;
 use num_integer::div_rem;
 use num_traits::Zero;
@@ -1265,7 +1269,7 @@ impl Encode for ExecutionResources {
     fn encode_to<T: parity_scale_codec::Output + ?Sized>(&self, dest: &mut T) {
         Encode::encode_to(&(self.n_steps as u64), dest);
         Encode::encode_to(&(self.n_memory_holes as u64), dest);
-        let builtin_instance_counter: Vec<(String, u64)> = self
+        let builtin_instance_counter: BTreeMap<String, u64> = self
             .builtin_instance_counter
             .clone()
             .into_iter()
@@ -1282,10 +1286,11 @@ impl Decode for ExecutionResources {
     ) -> Result<Self, parity_scale_codec::Error> {
         let n_steps = u64::decode(input)? as usize;
         let n_memory_holes = u64::decode(input)? as usize;
-        let builtin_instance_counter: HashMap<String, usize> = Vec::<(String, u64)>::decode(input)?
-            .into_iter()
-            .map(|(k, v)| (k, v as usize))
-            .collect();
+        let builtin_instance_counter: HashMap<String, usize> =
+            BTreeMap::<String, u64>::decode(input)?
+                .into_iter()
+                .map(|(k, v)| (k, v as usize))
+                .collect();
         Ok(Self {
             n_steps,
             n_memory_holes,
