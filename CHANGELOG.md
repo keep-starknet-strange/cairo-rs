@@ -2,6 +2,8 @@
 
 #### Upcoming Changes
 
+* fix: removed `compiler_version` field from `ProgramJson` in `vm/src/serde/deserialize_program.rs` as it was no longer used and causing deserialization issues.
+
 * feat: make *arbitrary* feature also enable a `proptest::arbitrary::Arbitrary` implementation for `Felt252` [#1355](https://github.com/lambdaclass/cairo-vm/pull/1355)
 
 * fix: correctly display invalid signature error message [#1361](https://github.com/lambdaclass/cairo-vm/pull/1361)
