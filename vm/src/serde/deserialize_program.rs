@@ -87,7 +87,6 @@ pub struct ProgramJson {
     pub attributes: Vec<Attribute>,
     pub debug_info: Option<DebugInfo>,
     pub main_scope: String,
-    pub compiler_version: String,
 }
 
 #[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary))]
@@ -880,7 +879,6 @@ pub fn parse_program(program: Program) -> ProgramJson {
                 instruction_locations,
             }),
         main_scope: String::default(),
-        compiler_version: String::default(),
     }
 }
 
