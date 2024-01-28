@@ -39,10 +39,8 @@ mod stdlib {
             borrow::ToOwned,
             boxed::Box,
             clone::Clone,
-            cmp::{Eq, PartialEq, Reverse},
-            fmt,
+            cmp::{Eq, PartialEq},
             iter::IntoIterator,
-            str::FromStr,
             string::{String, ToString},
             vec::Vec,
         };

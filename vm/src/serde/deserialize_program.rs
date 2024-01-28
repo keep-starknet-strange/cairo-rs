@@ -87,7 +87,6 @@ pub struct ProgramJson {
     pub attributes: Vec<Attribute>,
     pub debug_info: Option<DebugInfo>,
     pub main_scope: String,
-    pub compiler_version: String,
 }
 
 #[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary))]
@@ -880,7 +879,6 @@ pub fn parse_program(program: Program) -> ProgramJson {
                 instruction_locations,
             }),
         main_scope: String::default(),
-        compiler_version: String::default(),
     }
 }
 
@@ -1121,7 +1119,6 @@ mod tests {
             {
                 "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
                 "main_scope": "__main__",
-                "compiler_version": "0.11.0",
                 "attributes": [],
                 "debug_info": {
                     "instruction_locations": {}
@@ -1687,7 +1684,6 @@ mod tests {
             {
                 "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
                 "main_scope": "__main__",
-                "compiler_version": "0.11.0",
                 "attributes": [],
                 "debug_info": {
                     "instruction_locations": {}
@@ -1787,8 +1783,7 @@ mod tests {
                     "references": [
                     ]
                 },
-                "main_scope": "__main__",
-                "compiler_version": "0.11.0"
+                "main_scope": "__main__"
             }"#;
 
         let program_json: ProgramJson = serde_json::from_str(valid_json).unwrap();
@@ -1904,8 +1899,7 @@ mod tests {
                     "references": [
                     ]
                 },
-                "main_scope": "__main__",
-                "compiler_version": "0.11.0"
+                "main_scope": "__main__"
             }"#;
 
         let program_json: ProgramJson = serde_json::from_str(valid_json).unwrap();
@@ -2011,8 +2005,7 @@ mod tests {
                     "references": [
                     ]
                 },
-                "main_scope": "__main__",
-                "compiler_version": "0.11.0"
+                "main_scope": "__main__"
             }"#;
 
         let program_json: ProgramJson = serde_json::from_str(valid_json).unwrap();
