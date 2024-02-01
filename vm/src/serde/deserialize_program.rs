@@ -84,9 +84,9 @@ pub struct ProgramJson {
     pub identifiers: HashMap<String, Identifier>,
     pub hints: BTreeMap<usize, Vec<HintParams>>,
     pub reference_manager: ReferenceManager,
+    #[serde(default)]
     pub attributes: Vec<Attribute>,
     pub debug_info: Option<DebugInfo>,
-    pub main_scope: String,
 }
 
 #[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(Arbitrary))]
@@ -878,7 +878,6 @@ pub fn parse_program(program: Program) -> ProgramJson {
             .map(|instruction_locations| DebugInfo {
                 instruction_locations,
             }),
-        main_scope: String::default(),
     }
 }
 
@@ -1118,7 +1117,6 @@ mod tests {
         let valid_json = r#"
             {
                 "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
-                "main_scope": "__main__",
                 "attributes": [],
                 "debug_info": {
                     "instruction_locations": {}
@@ -1683,7 +1681,6 @@ mod tests {
         let valid_json = r#"
             {
                 "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
-                "main_scope": "__main__",
                 "attributes": [],
                 "debug_info": {
                     "instruction_locations": {}
@@ -1783,7 +1780,6 @@ mod tests {
                     "references": [
                     ]
                 },
-                "main_scope": "__main__"
             }"#;
 
         let program_json: ProgramJson = serde_json::from_str(valid_json).unwrap();
@@ -1899,7 +1895,6 @@ mod tests {
                     "references": [
                     ]
                 },
-                "main_scope": "__main__"
             }"#;
 
         let program_json: ProgramJson = serde_json::from_str(valid_json).unwrap();
@@ -2005,7 +2000,6 @@ mod tests {
                     "references": [
                     ]
                 },
-                "main_scope": "__main__"
             }"#;
 
         let program_json: ProgramJson = serde_json::from_str(valid_json).unwrap();
@@ -2182,7 +2176,6 @@ mod tests {
             "identifiers": {
                 "__main__.main": {}
             },
-            "main_scope": "",
             "prime": "0x800000000000011000000000000000000000000000000000000000000000001",
             "reference_manager": {
                 "references": []
